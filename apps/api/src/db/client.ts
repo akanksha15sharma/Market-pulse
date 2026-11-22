@@ -11,3 +11,12 @@ export function createDatabaseClient(
     adapter: new PrismaPg({ connectionString, max: 5 }),
   });
 }
+
+let shared: PrismaClient | undefined;
+export function getDatabaseClient() {
+  return (shared ??= createDatabaseClient());
+}
+export async function disconnectDatabase() {
+  await shared?.$disconnect();
+  shared = undefined;
+}

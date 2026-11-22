@@ -46,6 +46,7 @@ jobs:
           npm run db:deploy
           npm run test:db
           npm run test:auth:db
+          npm run test:markets:db
       - name: Stop PostgreSQL
         if: always()
         run: docker compose down

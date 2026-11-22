@@ -106,6 +106,7 @@ model Asset {
   mappings AssetProviderMapping[]
   quotes LatestQuote[]
   history HistoricalBar[]
+  historyCaches HistoryCache[]
   watchlistItems WatchlistItem[]
   transactions Transaction[]
   alerts PriceAlert[]
@@ -144,12 +145,13 @@ model HistoricalBar {
   mode DataMode
   currency String @default("USD") @db.VarChar(3)
   interval String @db.VarChar(10)
+  range String @default("1D") @db.VarChar(2)
   timestamp DateTime @db.Timestamptz(3)
   close Decimal @db.Decimal(38, 18)
   volume Decimal? @db.Decimal(38, 18)
   expiresAt DateTime @db.Timestamptz(3)
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  @@id([assetId, provider, mode, currency, interval, timestamp])
+  @@id([assetId, provider, mode, currency, range, interval, timestamp])
   @@index([expiresAt])
   @@map("historical_bars")
 }
@@ -310,4 +312,31 @@ model AuthRateLimit {
   @@id([key, windowStart])
   @@index([expiresAt])
   @@map("auth_rate_limits")
+}
+
+model HistoryCache {
+  assetId String @db.Uuid
+  provider Provider
+  mode DataMode
+  currency String @default("USD") @db.VarChar(3)
+  range String @db.VarChar(2)
+  fetchedAt DateTime? @db.Timestamptz(3)
+  freshUntil DateTime? @db.Timestamptz(3)
+  expiresAt DateTime? @db.Timestamptz(3)
+  pending Boolean @default(false)
+  nextAttemptAt DateTime @default(now()) @db.Timestamptz(3)
+  lastError String? @db.VarChar(50)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@id([assetId, provider, mode, currency, range])
+  @@index([pending, nextAttemptAt])
+  @@map("history_caches")
+}
+model MarketProviderState {
+  provider Provider @id
+  failures Int @default(0)
+  disabled Boolean @default(false)
+  blockedUntil DateTime? @db.Timestamptz(3)
+  lastSuccessAt DateTime? @db.Timestamptz(3)
+  lastError String? @db.VarChar(50)
+  @@map("market_provider_states")
 }

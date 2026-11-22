@@ -16,7 +16,11 @@
     "db:seed": "prisma db seed",
     "test:db": "node --import tsx --test --test-concurrency=1 tests/integration/database.test.ts",
     "test:auth": "node --import tsx --test --test-concurrency=1 tests/unit/auth.test.ts",
-    "test:auth:db": "node --import tsx --test --test-concurrency=1 tests/integration/auth.test.ts"
+    "test:auth:db": "node --import tsx --test --test-concurrency=1 tests/integration/auth.test.ts",
+    "test:markets": "node --import tsx --test --test-concurrency=1 tests/unit/markets.test.ts",
+    "test:markets:db": "node --import tsx --test --test-concurrency=1 tests/integration/markets.test.ts",
+    "worker:dev": "node --watch --import tsx src/worker.ts",
+    "worker:start": "node dist/worker.js"
   },
   "dependencies": {
     "@marketpulse/contracts": "*",

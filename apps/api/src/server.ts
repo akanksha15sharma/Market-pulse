@@ -1,5 +1,6 @@
-import { app } from './app.js';
+import { app, stopMarketWorker } from './app.js';
 import { env } from './config/env.js';
+import { disconnectDatabase } from './db/client.js';
 
 const server = app.listen(env.PORT, env.HOST, () => {
   console.log(`MarketPulse API listening on http://${env.HOST}:${env.PORT}`);
@@ -12,8 +13,13 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     const timeout = setTimeout(() => process.exit(1), 10_000).unref();
     server.close(() => {
-      clearTimeout(timeout);
-      process.exit(0);
+      void stopMarketWorker()
+        .then(disconnectDatabase)
+        .then(() => {
+          clearTimeout(timeout);
+          process.exit(0);
+        })
+        .catch(() => process.exit(1));
     });
   });
 }

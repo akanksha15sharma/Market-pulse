@@ -1,8 +1,9 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 3 authentication.
+Live Crypto & Stock Tracker with Price Alerts — Phase 4 market backend.
 Registration, sign-in, PostgreSQL sessions and account pages are implemented.
-Market, portfolio and alert features are not implemented yet.
+The market API and cache worker are implemented; market UI, portfolios and alerts
+are not implemented yet.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
 ## Requirements
@@ -84,3 +85,11 @@ disabled; local verification/recovery uses Mailpit on port 8025.
 
 Run npm test for security/API middleware and frontend checks. PostgreSQL lifecycle
 tests use npm run test:auth:db with explicit local TEST_DATABASE_URL. Phase 3 is locally verified as reported by the user; see PHASE3-VERIFICATION.md.
+
+## Market backend
+
+See [Phase 4 market backend](docs/market-backend.md) for cache-only REST endpoints,
+worker behavior, quota policy and the additive migration. Both asset types default
+to clearly labeled synthetic data; real crypto is explicitly configured server-side.
+Stocks remain demo-only. npm test includes fixture-based market tests; PostgreSQL
+coverage uses npm run test:markets:db. No market UI is included before Phase 5.

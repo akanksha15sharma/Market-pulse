@@ -73,7 +73,11 @@ export function createAuthService(
   return {
     async limit(key: string, max: number, windowMs: number) {
       if ((await repo.incrementLimit(key, windowMs)) > max)
-        throw new HttpError(429, 'Too many attempts. Try again later.');
+        throw new HttpError(
+          429,
+          'Too many attempts. Try again later.',
+          Math.ceil(windowMs / 1000),
+        );
     },
     async register(input: RegisterInput, old: string | undefined) {
       const passwordHash = await hashPassword(input.password);

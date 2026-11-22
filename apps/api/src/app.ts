@@ -8,10 +8,17 @@ import { HttpError } from './lib/http-error.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { sessionToken } from './modules/auth/security.js';
 import { createAuthService, type AuthService } from './modules/auth/service.js';
-import { createDatabaseClient } from './db/client.js';
+import { getDatabaseClient } from './db/client.js';
+import { marketRoutes } from './modules/markets/routes.js';
+import { createMarketRuntime } from './modules/markets/runtime.js';
+import type { MarketService } from './modules/markets/service.js';
 import { authMailer } from './email/auth-mailer.js';
 
-export function createApp(auth: AuthService, config: AuthConfig) {
+export function createApp(
+  auth: AuthService,
+  config: AuthConfig,
+  market?: MarketService,
+) {
   const app = express();
   app.disable('x-powered-by');
   // Trust no forwarded client IPs by default; configure a known proxy at deployment.
@@ -39,6 +46,7 @@ export function createApp(auth: AuthService, config: AuthConfig) {
     );
   });
   app.use('/api/v1/auth', authRoutes(auth, config));
+  if (market) app.use('/api/v1', marketRoutes(market, auth, config));
   app.get('/api/v1/private/profile', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({
@@ -58,7 +66,8 @@ export function createApp(auth: AuthService, config: AuthConfig) {
       return;
     }
     if (error instanceof HttpError) {
-      if (error.status === 429) res.set('Retry-After', '3600');
+      if (error.status === 429)
+        res.set('Retry-After', String(error.retryAfter ?? 3600));
       if (error.status === 503) res.set('Retry-After', '30');
       res.status(error.status).json({ error: error.message });
       return;
@@ -85,12 +94,18 @@ export function createApp(auth: AuthService, config: AuthConfig) {
 let service: AuthService | undefined;
 const lazyAuth = new Proxy({} as AuthService, {
   get(_target, key: keyof AuthService) {
-    service ??= createAuthService(
-      createDatabaseClient(),
-      authConfig,
-      authMailer,
-    );
+    service ??= createAuthService(getDatabaseClient(), authConfig, authMailer);
     return service[key];
   },
 });
-export const app = createApp(lazyAuth, authConfig);
+let marketRuntime: ReturnType<typeof createMarketRuntime> | undefined;
+const lazyMarket = new Proxy({} as MarketService, {
+  get(_target, key: keyof MarketService) {
+    marketRuntime ??= createMarketRuntime(getDatabaseClient());
+    return marketRuntime.service[key];
+  },
+});
+export async function stopMarketWorker() {
+  await marketRuntime?.stop();
+}
+export const app = createApp(lazyAuth, authConfig, lazyMarket);
