@@ -4,9 +4,11 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import type { MarketAsset, QuoteDto } from '@marketpulse/contracts';
+import { pollMarket } from '../src/features/markets/poll-market';
 import { HistoryChart } from '../src/features/markets/HistoryChart';
 import {
   MarketPolicy,
+  MarketSourcePolicy,
   QuoteCard,
 } from '../src/features/markets/MarketComponents';
 import {
@@ -20,6 +22,7 @@ import {
   historyInterval,
   loadHistory,
   loadOverview,
+  loadAsset,
   MarketRequestError,
   retryDelay,
   type History,
@@ -280,6 +283,233 @@ test('range changes are serialized and spaced without charging cancelled request
     context.mock.timers.reset();
     globalThis.fetch = original;
   }
+});
+
+test('optional status failures do not hide valid prices on overview or detail; recovery restores diagnostics', async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const failure of [
+      new Response('{}', { status: 500 }),
+      new Response('{"cryptoMode":"broken"}'),
+    ]) {
+      globalThis.fetch = async (input) => {
+        const path = String(input);
+        if (path.includes('/market-status')) return failure.clone();
+        return new Response(
+          JSON.stringify(
+            path.includes('/quotes')
+              ? { quotes: [quote] }
+              : path.includes(`/assets/${id}`)
+                ? { asset: stock }
+                : { assets: [stock], total: 1 },
+          ),
+        );
+      };
+      const overview = await loadOverview(new AbortController().signal);
+      assert.equal(overview.quotes[0]?.price, quote.price);
+      assert.equal(overview.status, null);
+      const detail = await loadAsset(id, new AbortController().signal);
+      assert.equal(detail.quote?.price, quote.price);
+      assert.equal(detail.status, null);
+      const html = renderToStaticMarkup(
+        <MarketSourcePolicy status={overview.status} />,
+      );
+      assert.match(html, /Provider status temporarily unavailable/);
+      assert.match(html, /Stocks use simulated data/);
+      assert.doesNotMatch(html, /worker is disabled|Real crypto mode selected/);
+    }
+    globalThis.fetch = async (input) =>
+      new Response(
+        JSON.stringify(
+          String(input).includes('/market-status')
+            ? status
+            : String(input).includes('/quotes')
+              ? { quotes: [quote] }
+              : { assets: [stock], total: 1 },
+        ),
+      );
+    assert.equal(
+      (await loadOverview(new AbortController().signal)).status?.cryptoMode,
+      'demo',
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('essential quote failures still reject rather than invent prices', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) =>
+      String(input).includes('/quotes')
+        ? new Response('{}', { status: 503 })
+        : new Response(
+            JSON.stringify(
+              String(input).includes('/market-status')
+                ? status
+                : { assets: [stock], total: 1 },
+            ),
+          );
+    await assert.rejects(
+      () => loadOverview(new AbortController().signal),
+      MarketRequestError,
+    );
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <QuoteCard asset={stock} />
+      </MemoryRouter>,
+    );
+    assert.match(html, /Simulated data/);
+    assert.match(html, /Unavailable/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('CoinPaprika observations survive unavailable diagnostics without losing real provenance', async () => {
+  const original = globalThis.fetch;
+  const live = {
+    ...quote,
+    assetId: crypto.id,
+    provider: 'COINPAPRIKA',
+    mode: 'REAL',
+    simulated: false,
+    price: '65000.12',
+  };
+  try {
+    globalThis.fetch = async (input) =>
+      String(input).includes('/market-status')
+        ? new Response('{}', { status: 503 })
+        : new Response(
+            JSON.stringify(
+              String(input).includes('/quotes')
+                ? { quotes: [live] }
+                : { assets: [crypto], total: 1 },
+            ),
+          );
+    const data = await loadOverview(new AbortController().signal);
+    assert.deepEqual(data.quotes, [live]);
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <QuoteCard asset={crypto} quote={data.quotes[0]} />
+      </MemoryRouter>,
+    );
+    assert.match(html, /COINPAPRIKA/);
+    assert.match(html, /Real market data/);
+    assert.doesNotMatch(html, /Simulated data/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+class Visibility extends EventTarget {
+  hidden = false;
+  change(hidden: boolean) {
+    this.hidden = hidden;
+    this.dispatchEvent(new Event('visibilitychange'));
+  }
+}
+
+test('polling updates prices every minute, pauses hidden tabs, resumes and cleans up', async (context) => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1_000 });
+  const visibility = new Visibility();
+  const received: number[] = [];
+  let calls = 0;
+  const stop = pollMarket(
+    async () => ++calls,
+    60_000,
+    (value) => received.push(value),
+    () => assert.fail('unexpected failure'),
+    visibility,
+  );
+  try {
+    await nextTurn();
+    assert.deepEqual(received, [1]);
+    context.mock.timers.tick(60_000);
+    await nextTurn();
+    assert.deepEqual(received, [1, 2]);
+    visibility.change(true);
+    context.mock.timers.tick(180_000);
+    await nextTurn();
+    assert.equal(calls, 2);
+    visibility.change(false);
+    await nextTurn();
+    assert.deepEqual(received, [1, 2, 3]);
+    stop();
+    context.mock.timers.tick(120_000);
+    await nextTurn();
+    assert.equal(calls, 3);
+  } finally {
+    stop();
+    context.mock.timers.reset();
+  }
+});
+
+test('polling retains last result on failure, honors cooldown across tab changes and recovers', async (context) => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1_000 });
+  const visibility = new Visibility();
+  const received: number[] = [];
+  let calls = 0;
+  let errors = 0;
+  const stop = pollMarket(
+    async () => {
+      calls++;
+      if (calls === 2) throw new MarketRequestError('Rate limited', 120_000);
+      return calls;
+    },
+    60_000,
+    (value) => received.push(value),
+    () => errors++,
+    visibility,
+  );
+  try {
+    await nextTurn();
+    context.mock.timers.tick(60_000);
+    await nextTurn();
+    assert.deepEqual(received, [1]);
+    assert.equal(errors, 1);
+    visibility.change(true);
+    visibility.change(false);
+    context.mock.timers.tick(119_999);
+    await nextTurn();
+    assert.equal(calls, 2);
+    context.mock.timers.tick(1);
+    await nextTurn();
+    assert.deepEqual(received, [1, 3]);
+  } finally {
+    stop();
+    context.mock.timers.reset();
+  }
+});
+
+test('visibility changes never overlap requests and unmount aborts pending responses', async () => {
+  const visibility = new Visibility();
+  let calls = 0;
+  let signal: AbortSignal | undefined;
+  let resolve!: (value: number) => void;
+  const received: number[] = [];
+  const stop = pollMarket(
+    (input) => {
+      calls++;
+      signal = input;
+      return new Promise<number>((done) => {
+        resolve = done;
+      });
+    },
+    60_000,
+    (value) => received.push(value),
+    () => assert.fail('unexpected failure'),
+    visibility,
+  );
+  visibility.change(true);
+  visibility.change(false);
+  visibility.change(false);
+  assert.equal(calls, 1);
+  stop();
+  assert.equal(signal?.aborted, true);
+  resolve(1);
+  await nextTurn();
+  assert.deepEqual(received, []);
 });
 
 test('429 honors numeric/date Retry-After and blocks manual retries during cooldown', async () => {

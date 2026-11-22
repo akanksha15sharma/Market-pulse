@@ -10,7 +10,7 @@ import { ALERT_ACTIVE_LIMIT } from '@marketpulse/contracts';
 import { loadOverview } from '../features/markets/api';
 import { useMarketResource } from '../features/markets/use-market-resource';
 import {
-  MarketPolicy,
+  MarketSourcePolicy,
   MarketLoading,
   ResourceError,
   DataLabel,
@@ -443,14 +443,7 @@ export function AlertsPage() {
           )}
         </section>
       )}
-      {market.data && (
-        <MarketPolicy
-          cryptoMode={market.data.status.cryptoMode}
-          cryptoSeconds={market.data.status.refreshSeconds.crypto}
-          workerEnabled={market.data.status.workerEnabled}
-          providers={market.data.status.providers}
-        />
-      )}
+      {market.data && <MarketSourcePolicy status={market.data.status} />}
     </div>
   );
 }

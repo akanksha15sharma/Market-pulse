@@ -71,27 +71,39 @@ async function read<T>(
 function validateSelection(
   assets: z.infer<typeof assetSchema>[],
   quotes: z.infer<typeof quoteSchema>[],
-  mode: string,
+  mode?: string,
 ) {
   for (const quote of quotes) {
     const asset = assets.find((value) => value.id === quote.assetId);
     const expected =
-      asset?.type === 'CRYPTO' && mode === 'coinpaprika'
-        ? 'COINPAPRIKA'
-        : 'DEMO';
+      asset?.type === 'STOCK' || mode === 'demo'
+        ? 'DEMO'
+        : mode === 'coinpaprika'
+          ? 'COINPAPRIKA'
+          : quote.provider;
     if (!asset || quote.provider !== expected)
       throw new MarketRequestError(
         'Market data mode changed. Reload to fetch matching observations.',
       );
   }
 }
+// Diagnostics must not hide independently validated catalog/price responses.
+// A failed status read never manufactures provider configuration or observations.
+async function readStatus(signal: AbortSignal) {
+  try {
+    return await read('/market-status', statusSchema, signal);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return null;
+  }
+}
 export async function loadOverview(signal: AbortSignal) {
   const [catalog, prices, status] = await Promise.all([
     read('/assets?limit=15', catalogSchema, signal),
     read('/quotes', quotesSchema, signal),
-    read('/market-status', statusSchema, signal),
+    readStatus(signal),
   ]);
-  validateSelection(catalog.assets, prices.quotes, status.cryptoMode);
+  validateSelection(catalog.assets, prices.quotes, status?.cryptoMode);
   return { assets: catalog.assets, quotes: prices.quotes, status };
 }
 export async function loadAsset(id: string, signal: AbortSignal) {
@@ -102,9 +114,9 @@ export async function loadAsset(id: string, signal: AbortSignal) {
       signal,
     ),
     read(`/quotes?assetIds=${encodeURIComponent(id)}`, quotesSchema, signal),
-    read('/market-status', statusSchema, signal),
+    readStatus(signal),
   ]);
-  validateSelection([detail.asset], prices.quotes, status.cryptoMode);
+  validateSelection([detail.asset], prices.quotes, status?.cryptoMode);
   return { asset: detail.asset, quote: prices.quotes[0], status };
 }
 

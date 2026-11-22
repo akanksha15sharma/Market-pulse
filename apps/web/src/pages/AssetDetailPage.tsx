@@ -17,7 +17,7 @@ import {
   DataLabel,
   QuoteNotice,
   MarketLoading,
-  MarketPolicy,
+  MarketSourcePolicy,
   ResourceError,
 } from '../features/markets/MarketComponents';
 import {
@@ -129,24 +129,14 @@ function AssetDetail({ id }: { id: string }) {
               </div>
             </div>
             <AssetHistory
-              key={`${range}:${asset.data.status.cryptoMode}`}
-              expectedProvider={
-                asset.data.asset.type === 'CRYPTO' &&
-                asset.data.status.cryptoMode === 'coinpaprika'
-                  ? 'COINPAPRIKA'
-                  : 'DEMO'
-              }
+              key={`${range}:${asset.data.quote?.provider}`}
+              expectedProvider={asset.data.quote?.provider}
               id={id}
               range={range}
               name={asset.data.asset.name}
             />
           </section>
-          <MarketPolicy
-            cryptoMode={asset.data.status.cryptoMode}
-            cryptoSeconds={asset.data.status.refreshSeconds.crypto}
-            workerEnabled={asset.data.status.workerEnabled}
-            providers={asset.data.status.providers}
-          />
+          <MarketSourcePolicy status={asset.data.status} />
         </>
       )}
     </div>
@@ -158,7 +148,7 @@ function AssetHistory({
   name,
   expectedProvider,
 }: {
-  expectedProvider: 'DEMO' | 'COINPAPRIKA';
+  expectedProvider?: 'DEMO' | 'COINPAPRIKA';
   id: string;
   range: HistoryRange;
   name: string;

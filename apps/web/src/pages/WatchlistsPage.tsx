@@ -12,7 +12,7 @@ import { useMarketResource } from '../features/markets/use-market-resource';
 import { filterAssets } from '../features/markets/presentation';
 import {
   MarketLoading,
-  MarketPolicy,
+  MarketSourcePolicy,
   ResourceError,
 } from '../features/markets/MarketComponents';
 import { WatchlistAssets } from '../features/watchlists/WatchlistAssets';
@@ -358,14 +358,7 @@ export function WatchlistsPage() {
           )}
         </div>
       </div>
-      {market.data && (
-        <MarketPolicy
-          cryptoMode={market.data.status.cryptoMode}
-          cryptoSeconds={market.data.status.refreshSeconds.crypto}
-          workerEnabled={market.data.status.workerEnabled}
-          providers={market.data.status.providers}
-        />
-      )}
+      {market.data && <MarketSourcePolicy status={market.data.status} />}
     </div>
   );
 }

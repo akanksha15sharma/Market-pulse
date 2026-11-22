@@ -4,7 +4,7 @@ import { useMarketResource } from '../features/markets/use-market-resource';
 import {
   DataLabel,
   MarketLoading,
-  MarketPolicy,
+  MarketSourcePolicy,
   QuoteCard,
   QuoteNotice,
   ResourceError,
@@ -18,7 +18,8 @@ import {
 } from '../features/markets/presentation';
 
 export function MarketDashboardPage() {
-  const { data, error, loading, retry } = useMarketResource(loadOverview);
+  const { data, error, loading, retry, checkedAt } =
+    useMarketResource(loadOverview);
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const type = ['CRYPTO', 'STOCK'].includes(params.get('type') ?? '')
@@ -58,12 +59,12 @@ export function MarketDashboardPage() {
       {error && <ResourceError message={error} retry={retry} />}
       {data && (
         <>
-          <MarketPolicy
-            cryptoMode={data.status.cryptoMode}
-            cryptoSeconds={data.status.refreshSeconds.crypto}
-            workerEnabled={data.status.workerEnabled}
-            providers={data.status.providers}
-          />
+          <MarketSourcePolicy status={data.status} />
+          <p className="price-meta" role="status">
+            Last checked: {observed(checkedAt)} · Auto-refresh every 60 seconds
+            while visible. Prices were last updated at the observation times
+            shown below.
+          </p>
           <section aria-labelledby="snapshot-heading">
             <div className="section-heading">
               <h2 id="snapshot-heading">Market snapshot</h2>
@@ -191,6 +192,8 @@ export function MarketDashboardPage() {
                                   {quote.provider}
                                 </span>
                               </>
+                            ) : asset.type === 'STOCK' ? (
+                              <DataLabel simulated />
                             ) : (
                               'Source pending'
                             )}
@@ -198,7 +201,7 @@ export function MarketDashboardPage() {
                           <td>
                             <span className={`status-${state}`}>{state}</span>
                             <span className="muted block source-name">
-                              {observed(quote?.sourceAt)}
+                              Last updated {observed(quote?.sourceAt)}
                             </span>
                             <QuoteNotice quote={quote} />
                           </td>

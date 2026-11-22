@@ -62,7 +62,9 @@ export function QuoteCard({
       >
         {change(quote?.changePercent)} <span className="muted">24h</span>
       </div>
-      {quote && <DataLabel simulated={quote.simulated} />}
+      {(quote || asset.type === 'STOCK') && (
+        <DataLabel simulated={quote?.simulated ?? true} />
+      )}
       <p className="price-meta">
         {quote?.provider ?? 'Source pending'} ·{' '}
         <span className={`status-${status}`}>{status}</span>
@@ -195,6 +197,38 @@ export function MarketPolicy({
             )}
           </div>
         )}
+      </div>
+    </aside>
+  );
+}
+
+export function MarketSourcePolicy({
+  status,
+}: {
+  status: MarketStatus | null;
+}) {
+  if (status)
+    return (
+      <MarketPolicy
+        cryptoMode={status.cryptoMode}
+        cryptoSeconds={status.refreshSeconds.crypto}
+        workerEnabled={status.workerEnabled}
+        providers={status.providers}
+      />
+    );
+  return (
+    <aside
+      className="market-policy"
+      aria-label="Data sources and refresh policy"
+    >
+      <div>
+        <strong>Provider status temporarily unavailable.</strong>
+        <p>
+          Prices show the source and observation time returned by the API.
+          Browser checks cached prices every 60 seconds while visible. Provider
+          refresh timing and worker health could not be verified. Stocks use
+          simulated data. Unavailable real crypto prices stay unavailable.
+        </p>
       </div>
     </aside>
   );
