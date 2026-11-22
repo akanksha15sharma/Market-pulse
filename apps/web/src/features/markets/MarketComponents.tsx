@@ -1,12 +1,38 @@
 import { Link } from 'react-router';
-import type { MarketAsset, QuoteDto } from '@marketpulse/contracts';
-import { change, money, observed, quoteStatus } from './presentation';
+import type {
+  MarketAsset,
+  QuoteDto,
+  MarketStatus,
+} from '@marketpulse/contracts';
+import {
+  change,
+  money,
+  observed,
+  quoteStatus,
+  marketReason,
+} from './presentation';
 
 export function DataLabel({ simulated }: { simulated: boolean }) {
   return (
     <span className={`data-label ${simulated ? 'is-demo' : 'is-real'}`}>
       {simulated ? 'Simulated data' : 'Real market data'}
     </span>
+  );
+}
+export function QuoteNotice({ quote }: { quote?: QuoteDto }) {
+  const state = quoteStatus(quote);
+  if (state === 'fresh' && !quote?.reason) return null;
+  return (
+    <p className="quote-notice">
+      {marketReason(
+        quote?.reason ??
+          (state === 'stale' ? 'stale_observation' : 'not_cached'),
+      )}
+      {quote &&
+        !quote.simulated &&
+        state === 'unavailable' &&
+        ' No simulated replacement is shown.'}
+    </p>
   );
 }
 export function QuoteCard({
@@ -43,6 +69,7 @@ export function QuoteCard({
         <br />
         Observed {observed(quote?.sourceAt)}
       </p>
+      <QuoteNotice quote={quote} />
     </Link>
   );
 }
@@ -79,11 +106,20 @@ export function MarketPolicy({
   cryptoMode,
   cryptoSeconds,
   workerEnabled,
+  providers,
 }: {
   cryptoMode: string;
   cryptoSeconds: number;
   workerEnabled: boolean;
+  providers?: MarketStatus['providers'];
 }) {
+  const live = providers?.find((provider) => provider.provider === 'COINGECKO');
+  const monthly = live?.budgets.find(
+    (budget) => budget.category === 'all:month',
+  );
+  const charts = live?.budgets.find(
+    (budget) => budget.category === 'charts:day',
+  );
   return (
     <aside
       className="market-policy"
@@ -98,9 +134,9 @@ export function MarketPolicy({
           'Crypto prices are also simulated.'
         ) : (
           <>
-            Real crypto observations are provided by{' '}
+            Data provided by{' '}
             <a
-              href="https://www.coingecko.com/"
+              href="https://www.coingecko.com/en/api"
               target="_blank"
               rel="noreferrer"
             >
@@ -116,6 +152,43 @@ export function MarketPolicy({
             ? 'Updates depend on the backend worker running.'
             : 'The market worker is disabled; cached observations may become stale.'}
         </p>
+        {cryptoMode === 'coingecko' && (
+          <div className="live-feed-status" role="status">
+            <strong>
+              {live?.quoteReason
+                ? 'Live crypto updates unavailable'
+                : 'Real crypto mode selected'}
+            </strong>
+            {live?.quoteReason && (
+              <p>
+                {marketReason(live.quoteReason)} Prices retain their real source
+                or stay unavailable.
+              </p>
+            )}
+            {live?.historyReason && live.historyReason !== live.quoteReason && (
+              <p>Historical charts: {marketReason(live.historyReason)}</p>
+            )}
+            <p>
+              No silent fallback to simulated crypto. Stocks remain simulated.
+            </p>
+            {live?.lastSuccessAt && (
+              <p>
+                Last successful provider request: {observed(live.lastSuccessAt)}
+              </p>
+            )}
+            {live?.blockedUntil && (
+              <p>Provider pause until {observed(live.blockedUntil)}</p>
+            )}
+            {monthly && (
+              <p>
+                Application live request budget remaining this account window:{' '}
+                {monthly.remaining}.{' '}
+                {charts &&
+                  `Chart requests remaining today: ${charts.remaining}.`}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );

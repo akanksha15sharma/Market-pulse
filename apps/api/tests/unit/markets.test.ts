@@ -468,3 +468,330 @@ test('a late history reader cannot requeue or hide a concurrently completed refr
   assert.equal(result.body.refresh, 'idle');
   assert.equal(result.body.points.length, 1);
 });
+
+test('real ingestion serves crypto quotes and charts without touching stock demo mode or old demo caches', async () => {
+  const fixture = memoryStore();
+  const timer = clock();
+  const asset = fixture.assets[0]!;
+  await fixture.store.saveQuotes(
+    (await demoProvider.quotes(fixture.assets, NOW)).map((quote) => ({
+      ...quote,
+      provider: 'DEMO',
+      mode: 'DEMO',
+      fetchedAt: NOW,
+    })),
+  );
+  await fixture.store.saveHistory(
+    { assetId: asset.id, provider: 'DEMO', mode: 'DEMO', range: '1D' },
+    [{ timestamp: NOW, price: '999' }],
+    NOW,
+    1800_000,
+  );
+  let calls = 0;
+  const provider = createCoinGeckoProvider(
+    'synthetic-secret',
+    async (input, options) => {
+      calls++;
+      const url = new URL(String(input));
+      assert.equal(url.origin, 'https://api.coingecko.com');
+      assert.ok(!url.toString().includes('synthetic-secret'));
+      assert.equal(
+        (options?.headers as Record<string, string>)['x-cg-demo-api-key'],
+        'synthetic-secret',
+      );
+      if (url.pathname.endsWith('/coins/markets')) {
+        const ids = url.searchParams.get('ids')!.split(',');
+        assert.equal(ids.length, 10);
+        return Response.json(
+          ids.map((id) => ({
+            id,
+            current_price: 123.45,
+            price_change_percentage_24h: 1.5,
+            last_updated: new Date(NOW - 60_000).toISOString(),
+          })),
+        );
+      }
+      assert.ok(url.pathname.endsWith('/bitcoin/market_chart'));
+      assert.equal(url.searchParams.get('days'), '1');
+      assert.equal(url.searchParams.has('interval'), false);
+      return Response.json({
+        prices: [
+          [NOW - 300_000, 122],
+          [NOW, 123.45],
+        ],
+      });
+    },
+  );
+  const service = createMarketService(
+    fixture.store,
+    real(),
+    () => {},
+    timer.now,
+  );
+  const cold = (await service.quotes()).quotes;
+  assert.ok(
+    cold
+      .slice(0, 10)
+      .every(
+        (quote) =>
+          quote.provider === 'COINGECKO' &&
+          !quote.simulated &&
+          quote.price === null,
+      ),
+  );
+  assert.ok(
+    cold
+      .slice(10)
+      .every((quote) => quote.provider === 'DEMO' && quote.simulated),
+  );
+  const pending = await service.history(asset.id, '1D');
+  assert.equal(pending.status, 202);
+  assert.deepEqual(pending.body.points, []);
+  await createMarketEngine(
+    fixture.store,
+    providers(provider),
+    real(),
+    timer,
+  ).tick();
+  assert.equal(calls, 2);
+  const live = (await service.quotes()).quotes;
+  assert.ok(
+    live
+      .slice(0, 10)
+      .every(
+        (quote) =>
+          quote.status === 'fresh' &&
+          quote.mode === 'REAL' &&
+          !quote.simulated &&
+          quote.price === '123.450000000000000000',
+      ),
+  );
+  assert.ok(
+    live.slice(10).every((quote) => quote.mode === 'DEMO' && quote.simulated),
+  );
+  const chart = await service.history(asset.id, '1D');
+  assert.equal(chart.status, 200);
+  assert.equal(chart.body.provider, 'COINGECKO');
+  assert.equal(chart.body.simulated, false);
+  assert.equal(chart.body.sourceAt, new Date(NOW).toISOString());
+  assert.equal(chart.body.points.at(-1)?.price, '123.450000000000000000');
+  for (let reader = 0; reader < 10; reader++) {
+    await service.quotes();
+    await service.history(asset.id, '1D');
+  }
+  assert.equal(calls, 2);
+  const status = await service.status();
+  assert.equal(
+    status.providers.find((row) => row.provider === 'COINGECKO')?.quoteReason,
+    null,
+  );
+  assert.ok(!JSON.stringify(status).includes('synthetic-secret'));
+});
+
+test('unconfigured live crypto makes no upstream requests and stays unavailable while stocks are simulated', async () => {
+  const fixture = memoryStore();
+  const timer = clock();
+  let calls = 0;
+  const settings = marketSettingsSchema.parse({
+    CRYPTO_DATA_MODE: 'coingecko',
+  });
+  const provider = createCoinGeckoProvider('', async () => {
+    calls++;
+    return Response.json([]);
+  });
+  await createMarketEngine(
+    fixture.store,
+    providers(provider),
+    settings,
+    timer,
+  ).tick();
+  assert.equal(calls, 0);
+  const service = createMarketService(
+    fixture.store,
+    settings,
+    () => {},
+    timer.now,
+  );
+  const quotes = (await service.quotes()).quotes;
+  assert.ok(
+    quotes
+      .slice(0, 10)
+      .every(
+        (quote) =>
+          quote.status === 'unavailable' &&
+          quote.provider === 'COINGECKO' &&
+          !quote.simulated &&
+          quote.reason === 'not_configured',
+      ),
+  );
+  assert.ok(
+    quotes
+      .slice(10)
+      .every((quote) => quote.status === 'fresh' && quote.simulated),
+  );
+  const providerStatus = (await service.status()).providers.find(
+    (row) => row.provider === 'COINGECKO',
+  )!;
+  assert.equal(providerStatus.quoteReason, 'not_configured');
+  assert.equal(providerStatus.historyReason, 'not_configured');
+});
+
+test('chart-only quota exhaustion does not label quote updates blocked; global exhaustion blocks both', async () => {
+  const fixture = memoryStore();
+  const settings = real({
+    CG_CHART_DAILY_LIMIT: '1',
+    CG_MONTHLY_ATTEMPT_LIMIT: '2',
+  });
+  const charts = budgetWindows(settings, NOW, 'history');
+  await fixture.store.reserve('COINGECKO', charts);
+  await fixture.store.settle('COINGECKO', charts);
+  const service = createMarketService(
+    fixture.store,
+    settings,
+    () => {},
+    () => NOW,
+  );
+  let status = (await service.status()).providers.find(
+    (row) => row.provider === 'COINGECKO',
+  )!;
+  assert.equal(status.quoteReason, null);
+  assert.equal(status.historyReason, 'quota_exhausted');
+  const quotes = budgetWindows(settings, NOW, 'quotes');
+  await fixture.store.reserve('COINGECKO', quotes);
+  await fixture.store.settle('COINGECKO', quotes);
+  status = (await service.status()).providers.find(
+    (row) => row.provider === 'COINGECKO',
+  )!;
+  assert.equal(status.quoteReason, 'quota_exhausted');
+  assert.equal(status.historyReason, 'quota_exhausted');
+  assert.equal(
+    status.budgets.find((row) => row.category === 'all:month')?.remaining,
+    0,
+  );
+});
+
+test('freshly fetched history with old source observations is stale for every supported range', async () => {
+  const fixture = memoryStore();
+  const asset = fixture.assets[0]!;
+  const sourceAges = {
+    '1D': 30 * 60_000,
+    '7D': 6 * 3600_000,
+    '1M': 6 * 3600_000,
+    '1Y': 48 * 3600_000,
+  } as const;
+  const service = createMarketService(
+    fixture.store,
+    real(),
+    () => {},
+    () => NOW,
+  );
+  for (const range of ['1D', '7D', '1M', '1Y'] as const) {
+    const key = {
+      assetId: asset.id,
+      provider: 'COINGECKO' as const,
+      mode: 'REAL' as const,
+      range,
+    };
+    await fixture.store.saveHistory(
+      key,
+      [{ timestamp: NOW - sourceAges[range] - 1, price: '123' }],
+      NOW,
+      24 * 3600_000,
+    );
+    let result = await service.history(asset.id, range);
+    assert.equal(result.body.status, 'stale');
+    assert.equal(result.body.reason, 'stale_observation');
+    assert.equal(result.body.fetchedAt, new Date(NOW).toISOString());
+    assert.equal(result.body.simulated, false);
+    assert.equal(result.body.points[0]?.price, '123');
+    // No repeated provider jobs just because the upstream source is behind.
+    assert.equal(result.body.refresh, 'idle');
+    await fixture.store.saveHistory(
+      key,
+      [{ timestamp: NOW, price: '124' }],
+      NOW,
+      1800_000,
+    );
+    result = await service.history(asset.id, range);
+    assert.equal(result.body.status, 'fresh');
+    assert.ok(result.body.freshUntil);
+    assert.ok(result.body.expiresAt);
+  }
+});
+
+test('live history failure retains stale real points and never substitutes an existing demo series', async () => {
+  const fixture = memoryStore();
+  const timer = clock();
+  const asset = fixture.assets[0]!;
+  const key = {
+    assetId: asset.id,
+    provider: 'COINGECKO' as const,
+    mode: 'REAL' as const,
+    range: '1D' as const,
+  };
+  await fixture.store.saveHistory(
+    key,
+    [{ timestamp: NOW - 3600_000, price: '123' }],
+    NOW - 3600_000,
+    1800_000,
+  );
+  await fixture.store.saveHistory(
+    { ...key, provider: 'DEMO', mode: 'DEMO' },
+    [{ timestamp: NOW, price: '999' }],
+    NOW,
+    1800_000,
+  );
+  const service = createMarketService(
+    fixture.store,
+    real(),
+    () => {},
+    timer.now,
+  );
+  await service.history(asset.id, '1D');
+  const provider = createCoinGeckoProvider(
+    'synthetic-secret',
+    async () => new Response('synthetic-secret upstream body', { status: 401 }),
+  );
+  await createMarketEngine(
+    fixture.store,
+    providers(provider),
+    real(),
+    timer,
+  ).tick();
+  const result = await service.history(asset.id, '1D');
+  assert.equal(result.body.status, 'stale');
+  assert.equal(result.body.provider, 'COINGECKO');
+  assert.equal(result.body.reason, 'unauthorized');
+  assert.deepEqual(
+    result.body.points.map((point) => point.price),
+    ['123'],
+  );
+  const status = (await service.status()).providers.find(
+    (row) => row.provider === 'COINGECKO',
+  )!;
+  assert.equal(status.quoteReason, 'unauthorized');
+  assert.equal(status.historyReason, 'unauthorized');
+  assert.ok(!JSON.stringify(status).includes('synthetic-secret'));
+});
+
+test('CoinGecko cannot ingest stocks or bypass approved application limits', async () => {
+  let calls = 0;
+  const provider = createCoinGeckoProvider('synthetic-secret', async () => {
+    calls++;
+    return Response.json([]);
+  });
+  await assert.rejects(
+    () => provider.quotes([memoryStore().assets[10]!], NOW),
+    (error: unknown) =>
+      error instanceof ProviderFailure && error.reason === 'invalid_data',
+  );
+  assert.equal(calls, 0);
+  for (const config of [
+    { CG_MONTHLY_ATTEMPT_LIMIT: 8001 },
+    { CG_DAILY_ATTEMPT_LIMIT: 261 },
+    { CG_MINUTE_ATTEMPT_LIMIT: 11 },
+    { CG_CHART_DAILY_LIMIT: 81 },
+    { STOCK_DATA_MODE: 'coingecko' },
+  ])
+    assert.equal(marketSettingsSchema.safeParse(config).success, false);
+});

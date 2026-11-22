@@ -1,5 +1,6 @@
 import {
   assetSchema,
+  HISTORY_SOURCE_MAX_AGE_MS,
   historyResponseSchema,
   quoteSchema,
   type HistoryRange,
@@ -140,14 +141,22 @@ export function createMarketService(
         (cached?.expiresAt ?? 0) > now() &&
         !!cached?.points.length;
       let usable = isUsable();
-      let fresh = usable && (cached?.freshUntil ?? 0) > now();
-      if (!fresh) {
+      let cacheFresh = usable && (cached?.freshUntil ?? 0) > now();
+      if (!cacheFresh) {
         await store.enqueue(key, now());
         cached = await store.history(key, now());
         usable = isUsable();
-        fresh = usable && (cached?.freshUntil ?? 0) > now();
+        cacheFresh = usable && (cached?.freshUntil ?? 0) > now();
       }
       activate();
+      const sourceAt = usable
+        ? Math.max(...cached!.points.map((point) => point.timestamp))
+        : null;
+      const sourceFresh =
+        sourceAt !== null &&
+        sourceAt <= now() + 60_000 &&
+        now() - sourceAt <= HISTORY_SOURCE_MAX_AGE_MS[range];
+      const fresh = cacheFresh && sourceFresh;
       const result = historyResponseSchema.parse({
         ...key,
         currency: 'USD',
@@ -158,7 +167,19 @@ export function createMarketService(
         fetchedAt: cached?.fetchedAt
           ? new Date(cached.fetchedAt).toISOString()
           : null,
-        reason: fresh ? null : (cached?.lastError ?? 'pending'),
+        sourceAt: sourceAt === null ? null : new Date(sourceAt).toISOString(),
+        freshUntil: cached?.freshUntil
+          ? new Date(cached.freshUntil).toISOString()
+          : null,
+        expiresAt: cached?.expiresAt
+          ? new Date(cached.expiresAt).toISOString()
+          : null,
+        reason: fresh
+          ? null
+          : (cached?.lastError ??
+            (usable
+              ? 'stale_observation'
+              : (unavailableReason(provider) ?? 'pending'))),
         points: usable
           ? cached!.points.map((point) => ({
               timestamp: new Date(point.timestamp).toISOString(),
@@ -172,15 +193,23 @@ export function createMarketService(
       const providers = await Promise.all(
         (['DEMO', 'COINGECKO'] as const).map(async (provider) => {
           const state = await store.state(provider);
-          let budgets: unknown[] = [];
+          let budgets: {
+            category: string;
+            remaining: number;
+            resetsAt: string;
+          }[] = [];
           let reason: string | null = null;
           if (provider === 'COINGECKO') {
             try {
               budgets = (
-                await store.usage(
-                  provider,
-                  budgetWindows(config, now(), 'history'),
-                )
+                await store.usage(provider, [
+                  ...new Map(
+                    [
+                      ...budgetWindows(config, now(), 'history'),
+                      ...budgetWindows(config, now(), 'quotes'),
+                    ].map((window) => [window.category, window]),
+                  ).values(),
+                ])
               ).map((window) => ({
                 category: window.category,
                 remaining: Math.max(0, window.limit - window.used),
@@ -191,8 +220,27 @@ export function createMarketService(
               else throw error;
             }
           }
+          const blocking =
+            reason ??
+            (state.disabled
+              ? 'unauthorized'
+              : state.blockedUntil && state.blockedUntil > now()
+                ? (state.lastError ?? 'circuit_open')
+                : null);
+          const exhausted = (category: 'quotes' | 'history') =>
+            budgets.some(
+              (budget) =>
+                budget.remaining === 0 &&
+                (budget.category.startsWith('all:') ||
+                  budget.category ===
+                    (category === 'quotes' ? 'quotes:month' : 'charts:day')),
+            );
           return {
             provider,
+            quoteReason:
+              blocking ?? (exhausted('quotes') ? 'quota_exhausted' : null),
+            historyReason:
+              blocking ?? (exhausted('history') ? 'quota_exhausted' : null),
             enabled:
               provider === 'DEMO' ||
               (config.CRYPTO_DATA_MODE === 'coingecko' &&
@@ -220,7 +268,7 @@ export function createMarketService(
         workerEnabled: config.MARKET_WORKER_ENABLED,
         alwaysOn: config.MARKET_ALWAYS_ON,
         attribution:
-          'Crypto market data provided by CoinGecko when real-data mode is enabled. Demo prices are synthetic.',
+          'Data provided by CoinGecko when real crypto mode is enabled. Demo prices are synthetic.',
         providers,
       };
     },

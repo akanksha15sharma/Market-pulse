@@ -1,4 +1,8 @@
-import type { MarketAsset, QuoteDto } from '@marketpulse/contracts';
+import {
+  HISTORY_SOURCE_MAX_AGE_MS,
+  type MarketAsset,
+  type QuoteDto,
+} from '@marketpulse/contracts';
 import type { History } from './api';
 
 export function money(value: string | null | undefined) {
@@ -74,4 +78,49 @@ export function chartPoints(history: Pick<History, 'points'>) {
         point.value > 0,
     )
     .sort((a, b) => a.time - b.time);
+}
+
+export function marketReason(reason: string | null | undefined) {
+  const messages: Record<string, string> = {
+    not_configured: 'Live crypto is not configured on the server.',
+    billing_window_inactive:
+      'Live crypto is paused outside the configured account window.',
+    quota_exhausted:
+      'The provider budget is exhausted. Updates resume after its reset.',
+    unauthorized: 'CoinGecko authentication failed. Live updates are disabled.',
+    rate_limited: 'CoinGecko requested a pause before the next update.',
+    network_error: 'CoinGecko could not be reached.',
+    upstream_error: 'CoinGecko is temporarily unavailable.',
+    invalid_data: 'The provider returned no usable observation.',
+    not_cached: 'Waiting for the first cached observation.',
+    pending: 'History is queued for background refresh.',
+    stale_observation: 'The latest source observation is out of date.',
+    source_not_enabled: 'This data source is no longer selected.',
+    circuit_open:
+      'Live updates are temporarily paused after provider failures.',
+    busy: 'A shared refresh is already in progress.',
+  };
+  return reason
+    ? (messages[reason] ?? 'The source is temporarily unavailable.')
+    : '';
+}
+export function historyStatus(history: History, now = Date.now()) {
+  if (
+    !history.points.length ||
+    history.status === 'unavailable' ||
+    (history.expiresAt && Date.parse(history.expiresAt) <= now)
+  )
+    return 'unavailable';
+  const latest = Math.max(
+    ...history.points.map((point) => Date.parse(point.timestamp)),
+  );
+  if (
+    history.status === 'stale' ||
+    (history.freshUntil && Date.parse(history.freshUntil) <= now) ||
+    !Number.isFinite(latest) ||
+    latest > now + 60_000 ||
+    now - latest > HISTORY_SOURCE_MAX_AGE_MS[history.range]
+  )
+    return 'stale';
+  return 'fresh';
 }

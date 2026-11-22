@@ -10,6 +10,7 @@ const child = spawn(
     'tests/auth.test.tsx',
     'tests/markets.test.tsx',
     'tests/watchlists.test.tsx',
+    'tests/live-crypto.test.tsx',
   ],
   {
     cwd: new URL('../apps/web/', import.meta.url),

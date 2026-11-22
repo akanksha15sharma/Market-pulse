@@ -6,6 +6,7 @@ import {
   MarketLoading,
   MarketPolicy,
   QuoteCard,
+  QuoteNotice,
   ResourceError,
 } from '../features/markets/MarketComponents';
 import {
@@ -61,6 +62,7 @@ export function MarketDashboardPage() {
             cryptoMode={data.status.cryptoMode}
             cryptoSeconds={data.status.refreshSeconds.crypto}
             workerEnabled={data.status.workerEnabled}
+            providers={data.status.providers}
           />
           <section aria-labelledby="snapshot-heading">
             <div className="section-heading">
@@ -198,6 +200,7 @@ export function MarketDashboardPage() {
                             <span className="muted block source-name">
                               {observed(quote?.sourceAt)}
                             </span>
+                            <QuoteNotice quote={quote} />
                           </td>
                         </tr>
                       );

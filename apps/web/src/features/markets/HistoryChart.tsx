@@ -1,6 +1,12 @@
 import { useId, useState } from 'react';
 import type { History } from './api';
-import { chartPoints, money, observed } from './presentation';
+import {
+  chartPoints,
+  money,
+  observed,
+  historyStatus,
+  marketReason,
+} from './presentation';
 import { DataLabel } from './MarketComponents';
 
 export function HistoryChart({
@@ -12,11 +18,14 @@ export function HistoryChart({
 }) {
   const title = useId();
   const gradient = useId();
-  const points = chartPoints(history);
+  const state = historyStatus(history);
+  const points = state === 'unavailable' ? [] : chartPoints(history);
   const [selected, setSelected] = useState<number | null>(null);
   if (!points.length)
     return (
       <div className="chart-empty" role="status">
+        <DataLabel simulated={history.simulated} />
+        <p>{history.provider} · unavailable</p>
         <strong>
           {history.refresh === 'pending'
             ? 'Preparing price history'
@@ -27,6 +36,10 @@ export function HistoryChart({
             ? 'The backend has queued this range. We check again in 20 seconds while this tab is visible.'
             : 'No usable historical observations are cached for this range.'}
         </p>
+        <p>{marketReason(history.reason)}</p>
+        {!history.simulated && (
+          <p>No simulated history is substituted for real crypto.</p>
+        )}
       </div>
     );
   const currentIndex = Math.min(
@@ -165,11 +178,31 @@ export function HistoryChart({
         />
       </label>
       <figcaption>
-        {history.provider} · {history.status} · {history.granularity} samples ·
-        Cache fetched {observed(history.fetchedAt)}.{' '}
+        {history.provider} · <span className={`status-${state}`}>{state}</span>{' '}
+        · {history.granularity} samples · Cache fetched{' '}
+        {observed(history.fetchedAt)}.{' '}
         {history.refresh === 'pending' &&
           'A refresh is queued; cached history remains visible.'}
       </figcaption>
+      <p className="quote-notice">
+        Latest source observation{' '}
+        {observed(history.sourceAt ?? points.at(-1)?.timestamp)}.{' '}
+        {state === 'stale' &&
+          marketReason(history.reason ?? 'stale_observation')}
+      </p>
+      {!history.simulated && (
+        <p className="quote-notice">
+          Data provided by{' '}
+          <a
+            href="https://www.coingecko.com/en/api"
+            target="_blank"
+            rel="noreferrer"
+          >
+            CoinGecko
+          </a>
+          .
+        </p>
+      )}
       <details className="chart-data">
         <summary>View {points.length} observations as a table</summary>
         <div className="chart-data-scroll">

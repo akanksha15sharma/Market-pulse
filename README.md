@@ -109,3 +109,12 @@ quotes with source, freshness and simulated-data labels. Limits are five lists p
 user and twenty assets per list. Existing PostgreSQL tables are reused; no new
 migration is required. See [watchlist API, setup and acceptance](docs/watchlists.md)
 and [Phase 6 verification](PHASE6-VERIFICATION.md). Phase 7 has not started.
+
+## Real crypto data
+
+The dashboard, asset details and watchlists consume the existing server-side
+CoinGecko quotes and historical caches when explicitly configured. Stocks remain
+simulated. See [server-only live setup and quota preflight](docs/live-crypto.md) and
+[live verification results](LIVE-CRYPTO-VERIFICATION.md). Run npm run markets:check
+after configuring apps/api/.env; it makes no upstream calls. Without credentials,
+CoinGecko mode reports unavailable instead of substituting synthetic crypto.

@@ -826,3 +826,21 @@
     padding-right: 1rem;
   }
 }
+
+.quote-notice {
+  margin-top: 0.5rem;
+  max-width: 28rem;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: normal;
+}
+.quote-notice a {
+  color: #5eead4;
+  text-decoration: underline;
+}
+.live-feed-status {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #31565b;
+}

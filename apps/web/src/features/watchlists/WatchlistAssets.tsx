@@ -4,7 +4,7 @@ import type {
   WatchlistView,
 } from '@marketpulse/contracts';
 import { Link } from 'react-router';
-import { DataLabel } from '../markets/MarketComponents';
+import { DataLabel, QuoteNotice } from '../markets/MarketComponents';
 import { change, money, observed, quoteStatus } from '../markets/presentation';
 
 export function WatchlistAssets({
@@ -96,6 +96,7 @@ export function WatchlistAssets({
                       <span className="source-name block muted">
                         {observed(quote.sourceAt)}
                       </span>
+                      <QuoteNotice quote={quote} />
                     </>
                   ) : (
                     <>

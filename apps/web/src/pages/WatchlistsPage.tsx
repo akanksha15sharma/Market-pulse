@@ -363,6 +363,7 @@ export function WatchlistsPage() {
           cryptoMode={market.data.status.cryptoMode}
           cryptoSeconds={market.data.status.refreshSeconds.crypto}
           workerEnabled={market.data.status.workerEnabled}
+          providers={market.data.status.providers}
         />
       )}
     </div>

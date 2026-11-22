@@ -15,6 +15,7 @@ const HistoryChart = lazy(() =>
 );
 import {
   DataLabel,
+  QuoteNotice,
   MarketLoading,
   MarketPolicy,
   ResourceError,
@@ -102,11 +103,7 @@ function AssetDetail({ id }: { id: string }) {
                 {observed(asset.data.quote?.sourceAt)}
               </p>
               <p>Cache fetched {observed(asset.data.quote?.fetchedAt)}</p>
-              {asset.data.quote?.reason && (
-                <p>
-                  Source status: {asset.data.quote.reason.replaceAll('_', ' ')}
-                </p>
-              )}
+              <QuoteNotice quote={asset.data.quote} />
             </div>
           </section>
           <section className="market-panel" aria-labelledby="history-heading">
@@ -132,7 +129,13 @@ function AssetDetail({ id }: { id: string }) {
               </div>
             </div>
             <AssetHistory
-              key={range}
+              key={`${range}:${asset.data.status.cryptoMode}`}
+              expectedProvider={
+                asset.data.asset.type === 'CRYPTO' &&
+                asset.data.status.cryptoMode === 'coingecko'
+                  ? 'COINGECKO'
+                  : 'DEMO'
+              }
               id={id}
               range={range}
               name={asset.data.asset.name}
@@ -142,6 +145,7 @@ function AssetDetail({ id }: { id: string }) {
             cryptoMode={asset.data.status.cryptoMode}
             cryptoSeconds={asset.data.status.refreshSeconds.crypto}
             workerEnabled={asset.data.status.workerEnabled}
+            providers={asset.data.status.providers}
           />
         </>
       )}
@@ -152,14 +156,16 @@ function AssetHistory({
   id,
   range,
   name,
+  expectedProvider,
 }: {
+  expectedProvider: 'DEMO' | 'COINGECKO';
   id: string;
   range: HistoryRange;
   name: string;
 }) {
   const request = useCallback(
-    (signal: AbortSignal) => loadHistory(id, range, signal),
-    [id, range],
+    (signal: AbortSignal) => loadHistory(id, range, signal, expectedProvider),
+    [id, range, expectedProvider],
   );
   const { data, loading, error, retry } = useMarketResource(
     request,

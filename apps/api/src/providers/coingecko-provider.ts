@@ -32,6 +32,8 @@ const historySchema = z.object({
     .max(5000),
 });
 function externalId(asset: CatalogAsset) {
+  if (asset.type !== 'CRYPTO' || asset.isDemoOnly)
+    throw new ProviderFailure('invalid_data');
   const id = asset.mappings.find(
     (mapping) => mapping.provider === 'COINGECKO',
   )?.externalId;

@@ -3,6 +3,7 @@ import {
   assetSchema,
   historyResponseSchema,
   quoteSchema,
+  marketStatusSchema,
   type HistoryRange,
 } from '@marketpulse/contracts';
 
@@ -11,13 +12,7 @@ const catalogSchema = z.object({
   total: z.number(),
 });
 const quotesSchema = z.object({ quotes: z.array(quoteSchema) });
-const statusSchema = z.object({
-  cryptoMode: z.enum(['demo', 'coingecko']),
-  stockMode: z.literal('demo'),
-  refreshSeconds: z.object({ crypto: z.number(), stocks: z.number() }),
-  workerEnabled: z.boolean(),
-  attribution: z.string(),
-});
+const statusSchema = marketStatusSchema;
 export type History = z.infer<typeof historyResponseSchema>;
 export type Overview = Awaited<ReturnType<typeof loadOverview>>;
 export class MarketRequestError extends Error {
@@ -73,12 +68,28 @@ async function read<T>(
   // 202 contains the same typed history response, with refresh=pending.
   return schema.parse(await response.json());
 }
+function validateSelection(
+  assets: z.infer<typeof assetSchema>[],
+  quotes: z.infer<typeof quoteSchema>[],
+  mode: string,
+) {
+  for (const quote of quotes) {
+    const asset = assets.find((value) => value.id === quote.assetId);
+    const expected =
+      asset?.type === 'CRYPTO' && mode === 'coingecko' ? 'COINGECKO' : 'DEMO';
+    if (!asset || quote.provider !== expected)
+      throw new MarketRequestError(
+        'Market data mode changed. Reload to fetch matching observations.',
+      );
+  }
+}
 export async function loadOverview(signal: AbortSignal) {
   const [catalog, prices, status] = await Promise.all([
     read('/assets?limit=15', catalogSchema, signal),
     read('/quotes', quotesSchema, signal),
     read('/market-status', statusSchema, signal),
   ]);
+  validateSelection(catalog.assets, prices.quotes, status.cryptoMode);
   return { assets: catalog.assets, quotes: prices.quotes, status };
 }
 export async function loadAsset(id: string, signal: AbortSignal) {
@@ -91,6 +102,7 @@ export async function loadAsset(id: string, signal: AbortSignal) {
     read(`/quotes?assetIds=${encodeURIComponent(id)}`, quotesSchema, signal),
     read('/market-status', statusSchema, signal),
   ]);
+  validateSelection([detail.asset], prices.quotes, status.cryptoMode);
   return { asset: detail.asset, quote: prices.quotes[0], status };
 }
 
@@ -101,6 +113,7 @@ export async function loadHistory(
   id: string,
   range: HistoryRange,
   signal: AbortSignal,
+  expectedProvider?: 'DEMO' | 'COINGECKO',
 ) {
   const previous = historyQueue;
   let release!: () => void;
@@ -125,11 +138,16 @@ export async function loadHistory(
       else signal.addEventListener('abort', abort, { once: true });
     });
     nextHistoryAt = Date.now() + 10_100;
-    return await read(
+    const history = await read(
       `/assets/${encodeURIComponent(id)}/history?range=${range}`,
       historyResponseSchema,
       signal,
     );
+    if (expectedProvider && history.provider !== expectedProvider)
+      throw new MarketRequestError(
+        'Market data mode changed. Reload to fetch matching observations.',
+      );
+    return history;
   } finally {
     release();
   }

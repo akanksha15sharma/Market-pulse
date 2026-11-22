@@ -36,7 +36,8 @@
     "worker:dev": "npm run db:generate -w @marketpulse/api && npm run build -w @marketpulse/contracts && npm run worker:dev -w @marketpulse/api",
     "worker:start": "npm run worker:start -w @marketpulse/api",
     "test:watchlists": "npm run test:watchlists -w @marketpulse/api",
-    "test:watchlists:db": "npm run test:watchlists:db -w @marketpulse/api"
+    "test:watchlists:db": "npm run test:watchlists:db -w @marketpulse/api",
+    "markets:check": "npm run markets:check -w @marketpulse/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
