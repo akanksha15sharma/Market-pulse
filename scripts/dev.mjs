@@ -4,6 +4,8 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const children = ['contracts', 'api', 'web'].map((name) =>
   spawn(npm, ['run', 'dev', '-w', `@marketpulse/${name}`], {
     stdio: 'inherit',
+    // Give each POSIX watcher tree a group so npm's descendants stop with it.
+    detached: process.platform !== 'win32',
     shell: process.platform === 'win32',
   }),
 );
@@ -12,7 +14,17 @@ function stop(code) {
   if (stopping) return;
   stopping = true;
   process.exitCode = code;
-  for (const child of children) child.kill('SIGTERM');
+  for (const child of children) {
+    if (process.platform === 'win32') {
+      child.kill('SIGTERM');
+    } else if (child.pid) {
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+      }
+    }
+  }
 }
 for (const child of children) {
   child.on('error', (error) => {
