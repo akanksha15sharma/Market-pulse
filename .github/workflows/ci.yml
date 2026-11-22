@@ -21,6 +21,7 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run build
+      - run: npm test
       - name: Verify development PostgreSQL
         run: |
           docker compose config --quiet
@@ -44,6 +45,7 @@ jobs:
         run: |
           npm run db:deploy
           npm run test:db
+          npm run test:auth:db
       - name: Stop PostgreSQL
         if: always()
         run: docker compose down

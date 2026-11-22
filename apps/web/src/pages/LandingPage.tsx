@@ -14,8 +14,8 @@ export function LandingPage() {
       <div className="mt-10 rounded-2xl border border-slate-700 bg-slate-900 p-6">
         <h2 className="text-lg font-medium">Development in progress</h2>
         <p className="mt-2 leading-relaxed text-slate-400">
-          This initial layout contains no market data or account features.
-          Market tracking will arrive in later development phases.
+          Account registration and sign-in are available. Market tracking will
+          arrive in later development phases.
         </p>
       </div>
     </section>

@@ -20,9 +20,14 @@ export function AppLayout() {
           >
             MarketPulse
           </Link>
-          <span className="text-sm text-slate-400">
-            Crypto &amp; stock tracker
-          </span>
+          <div className="flex gap-5 text-sm">
+            <Link to="/account" className="text-slate-300 hover:text-teal-300">
+              Account
+            </Link>
+            <Link to="/login" className="text-teal-300">
+              Sign in
+            </Link>
+          </div>
         </nav>
       </header>
       <main id="main" className="mx-auto max-w-6xl px-6 py-16">

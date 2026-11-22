@@ -26,7 +26,11 @@
     "db:deploy": "npm run db:deploy -w @marketpulse/api",
     "db:status": "npm run db:status -w @marketpulse/api",
     "db:seed": "npm run db:seed -w @marketpulse/api",
-    "test:db": "npm run test:db -w @marketpulse/api"
+    "test:db": "npm run test:db -w @marketpulse/api",
+    "test:auth": "npm run test:auth -w @marketpulse/api",
+    "test:auth:db": "npm run test:auth:db -w @marketpulse/api",
+    "test:web": "node scripts/test-web.mjs",
+    "test": "npm run build -w @marketpulse/contracts && npm run test:auth && npm run test:web"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

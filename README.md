@@ -1,7 +1,8 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 2 database foundation (locally verified).
-No market, authentication, portfolio or alert features are implemented yet.
+Live Crypto & Stock Tracker with Price Alerts — Phase 3 authentication.
+Registration, sign-in, PostgreSQL sessions and account pages are implemented.
+Market, portfolio and alert features are not implemented yet.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
 ## Requirements
@@ -10,19 +11,23 @@ Node.js 22.12+ within Node 22 (use `nvm use`), npm 9+, Docker with Compose v2.
 
 ## Local setup
 
+For a fresh checkout (merge example values instead if environment files already exist):
+
 ```sh
-npm install
+npm ci
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 npm run db:up
+npm run db:generate
+npm run db:deploy
+npm run db:seed
 npm run dev
 ```
 
 Frontend: http://127.0.0.1:5173. API: http://127.0.0.1:3001/api/v1/health/live.
 Vite proxies `/api` to Express, so the browser uses the same origin. Change
-`API_PROXY_TARGET` if you change the API port. Environment files are optional for
-Phase 1 defaults. Database credentials are local-only; keep custom root Compose
+`API_PROXY_TARGET` if you change the API port. Authentication requires DATABASE_URL; set APP_ORIGIN to your browser origin. Database credentials are local-only; keep custom root Compose
 values and the API DATABASE_URL consistent. Prisma migrations and catalog seeding are described in [database setup](docs/database.md).
 `npm run db:down` stops PostgreSQL while retaining the named data volume.
 
@@ -68,5 +73,15 @@ No provider keys are required. Never put secrets in frontend environment variabl
 ## Database development
 
 See [database setup and relationships](docs/database.md) for migrations, seeding and
-isolated PostgreSQL integration tests. Authentication tables exist, but there are no
-Phase 3 handlers or auth endpoints. Provider quotes and user accounts are not seeded.
+isolated PostgreSQL integration tests. Authentication routes now use these tables. Provider quotes and user accounts are not seeded.
+
+## Authentication
+
+See [Phase 3 authentication](docs/authentication.md) for endpoints, secure session
+behavior, local Mailpit configuration and the new migration. Merge environment
+examples into existing files instead of overwriting them. Production email remains
+disabled; local verification/recovery uses Mailpit on port 8025.
+
+Run npm test for security/API middleware and frontend checks. PostgreSQL lifecycle
+tests use npm run test:auth:db with explicit local TEST_DATABASE_URL. Phase 3 database
+verification is still pending in this agent environment; see PHASE3-VERIFICATION.md.

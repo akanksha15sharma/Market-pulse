@@ -2,12 +2,26 @@ import { createBrowserRouter } from 'react-router';
 import { AppLayout } from '../layouts/AppLayout';
 import { LandingPage } from '../pages/LandingPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-
+import { LoginPage } from '../pages/LoginPage';
+import { RegisterPage } from '../pages/RegisterPage';
+import { AccountPage } from '../pages/AccountPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
+import { RouteErrorPage } from '../pages/RouteErrorPage';
+import { accountLoader } from '../features/auth/loaders';
 export const router = createBrowserRouter([
   {
     element: <AppLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/', element: <LandingPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
+      { path: '/verify-email', element: <VerifyEmailPage /> },
+      { path: '/account', loader: accountLoader, element: <AccountPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
