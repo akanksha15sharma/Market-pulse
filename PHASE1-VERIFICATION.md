@@ -98,3 +98,29 @@ Open http://127.0.0.1:5173 and an unknown path in a browser. Stop development,
 start the compiled API with npm run start -w @marketpulse/api and check liveness
 again. After install/checks succeed, commit package-lock.json, switch CI to npm ci
 with npm caching, and verify a clean npm ci/build before claiming completion.
+
+## API watcher fix — subsequent verification
+
+Dependencies are now installed in the workspace; the earlier installation failures
+above are historical. The user reports direct API health succeeds on port 3001.
+
+Reproduced the API dev failure: tsx watch exits before application startup because
+its Unix IPC listener at /tmp/tsx-1000/*.pipe fails EPERM in this environment.
+Changed only the API dev command to Node 22 native watch with --import tsx and
+--watch-preserve-output. Dependency declarations are unchanged.
+
+Verification completed:
+
+- npm run lint, npm run typecheck, npm run build and npm run format:check pass.
+- Actual npm API dev command starts the watcher and restarts after touching API
+  source and imported compiled contracts. Application binding still fails EPERM in
+  this execution environment; a successful HTTP health response was not reproduced here.
+- A temporary TypeScript fixture using the same native watcher and importing the
+  real contracts package starts, restarts on source and contract changes, recovers
+  after an introduced syntax error, and shuts down with exit code 0. Fixture removed.
+- No application dependency change, no Phase 2 implementation, no edits to Phase 0 docs.
+- The pre-existing untracked package-lock.json is intentionally left untouched and
+  outside this focused watcher commit.
+
+Environment-file changes require manual restart. Native watch tracks imported API
+and contract modules; root npm run dev continues to compile contracts in watch mode.

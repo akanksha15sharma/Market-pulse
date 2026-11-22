@@ -29,6 +29,9 @@ values and the API DATABASE_URL consistent. No database connection/migrations ye
 The root dev command builds shared contracts first, then watches contracts, API and
 frontend together. Shared runtime exports live in `dist`, not TypeScript source.
 A fresh clone requires the root build/dev command before standalone API startup.
+The API uses Node 22 native watch mode with the existing `tsx` loader. It watches
+imported API modules and shared contracts without the Unix IPC listener required
+by the `tsx watch` CLI. Environment-file changes require a manual restart.
 
 ## Checks and production builds
 
