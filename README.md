@@ -83,5 +83,4 @@ examples into existing files instead of overwriting them. Production email remai
 disabled; local verification/recovery uses Mailpit on port 8025.
 
 Run npm test for security/API middleware and frontend checks. PostgreSQL lifecycle
-tests use npm run test:auth:db with explicit local TEST_DATABASE_URL. Phase 3 database
-verification is still pending in this agent environment; see PHASE3-VERIFICATION.md.
+tests use npm run test:auth:db with explicit local TEST_DATABASE_URL. Phase 3 is locally verified as reported by the user; see PHASE3-VERIFICATION.md.

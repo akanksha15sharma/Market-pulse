@@ -1,7 +1,9 @@
 # Phase 3 verification
 
-Status: implementation complete; non-database checks pass. PostgreSQL runtime
-acceptance remains blocked in the agent session. Phase 4 has not started.
+Status: locally verified. The user reports all 12 Phase 3 tests passing, successful
+database migrations, and passing lint, typecheck and build. These local results
+supersede the initial agent-environment blockers recorded below; the database tests
+were not independently rerun for this documentation update. Phase 4 is now authorized.
 The repository moved during work to ~/Documents/marketpulse; existing commits and
 changes were preserved and work continued there.
 
@@ -16,8 +18,8 @@ changes were preserved and work continued there.
 | Frontend tests                                 | 2 passed: form rendering/password-manager attributes and protected-loader redirect/error behavior    |
 | Lockfile consistency                           | Dependency declarations unchanged and match committed lockfile                                       |
 | Compose configuration                          | Validates; Mailpit is localhost-bound                                                                |
-| Application migration deployment               | Blocked: Prisma P1001 reaching local PostgreSQL                                                      |
-| PostgreSQL auth lifecycle tests                | Authored 4 tests; blocked before scenarios by database connection failure                            |
+| Application migration deployment               | Succeeded locally, reported by user                                                                  |
+| PostgreSQL auth lifecycle tests                | 4 passed locally, reported by user; all 12 Phase 3 tests passed                                      |
 | Existing Phase 2 DB tests                      | Reattempted; blocked by database connection failure, not a confirmed regression                      |
 | Docker daemon                                  | EPERM connecting to /var/run/docker.sock                                                             |
 | Browser HTTP/Mailpit manual flows              | Not verified in this session                                                                         |
@@ -37,14 +39,13 @@ concurrent reset, global session revocation and persistent concurrent rate limit
 Tests accept only an explicit local marketpulse_test database, clean up only their
 own fixture records, and use an in-memory mail sink.
 
-## Remaining host verification
+## Local verification follow-up
 
-See [authentication setup](docs/authentication.md) for commands. Apply the new
-20261122000200_auth_rate_limits migration to both existing databases, then run
-npm run test:auth:db and npm run test:db with TEST_DATABASE_URL set to the local test
-database. Existing Phase 2 migrations must not be changed or reset. Run the manual
-browser/Mailpit checklist and confirm production cookie configuration before public
-use. Record the host results before claiming Phase 3 fully verified.
+The user confirmed migrations succeeded and all 12 Phase 3 tests passed locally,
+along with lint, typecheck and build. Earlier P1001 and Docker EPERM results describe
+the restricted agent session only and are retained as historical context. Manual
+browser/Mailpit flows and remote CI were not separately confirmed by this report.
+See [authentication setup](docs/authentication.md) for reproducible commands.
 
 No new npm dependencies were introduced. Password-hashing choice is documented in
 [ADR 0002](docs/decisions/0002-password-hashing.md); approved Phase 0 documents remain

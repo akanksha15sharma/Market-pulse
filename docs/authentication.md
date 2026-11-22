@@ -1,7 +1,7 @@
 # Phase 3 — authentication
 
-Status: implemented; non-database checks pass, PostgreSQL acceptance pending in the
-agent execution environment. No Phase 4 market-data integration is included.
+Status: locally verified. The user reports all 12 Phase 3 tests, migrations, lint,
+typecheck and build passing. See PHASE3-VERIFICATION.md for evidence attribution.
 
 ## Implementation and endpoints
 
