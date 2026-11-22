@@ -1,4 +1,9 @@
 import express from 'express';
+import { alertRoutes } from './modules/alerts/routes.js';
+import {
+  createAlertService,
+  type AlertService,
+} from './modules/alerts/service.js';
 import { watchlistRoutes } from './modules/watchlists/routes.js';
 import {
   createWatchlistService,
@@ -24,6 +29,7 @@ export function createApp(
   config: AuthConfig,
   market?: MarketService,
   watchlists?: WatchlistService,
+  alerts?: AlertService,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -54,6 +60,7 @@ export function createApp(
   app.use('/api/v1/auth', authRoutes(auth, config));
   if (watchlists)
     app.use('/api/v1/watchlists', watchlistRoutes(watchlists, auth, config));
+  if (alerts) app.use('/api/v1/alerts', alertRoutes(alerts, auth, config));
   if (market) app.use('/api/v1', marketRoutes(market, auth, config));
   app.get('/api/v1/private/profile', async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -123,4 +130,17 @@ const lazyWatchlists = new Proxy({} as WatchlistService, {
     return watchlistService[key];
   },
 });
-export const app = createApp(lazyAuth, authConfig, lazyMarket, lazyWatchlists);
+let alertService: AlertService | undefined;
+const lazyAlerts = new Proxy({} as AlertService, {
+  get(_target, key: keyof AlertService) {
+    alertService ??= createAlertService(getDatabaseClient());
+    return alertService[key];
+  },
+});
+export const app = createApp(
+  lazyAuth,
+  authConfig,
+  lazyMarket,
+  lazyWatchlists,
+  lazyAlerts,
+);

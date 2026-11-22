@@ -9,6 +9,7 @@ The project focuses on responsive design, secure authentication, reliable market
 ## ✨ Features
 
 ### 📊 Market Dashboard
+
 - Interactive cryptocurrency and stock market dashboard
 - Asset search, filtering, and sorting
 - Price cards with 24-hour changes
@@ -16,12 +17,14 @@ The project focuses on responsive design, secure authentication, reliable market
 - Responsive interface with dark-themed styling
 
 ### 📉 Historical Price Charts
+
 - Interactive price history visualizations
 - Multiple supported time ranges
 - Historical data retrieved through backend APIs
 - Clear loading, stale, and unavailable states
 
 ### ⭐ Personalized Watchlists
+
 - Create, rename, and delete watchlists
 - Add and remove cryptocurrency and stock assets
 - View saved assets with their latest available prices
@@ -29,6 +32,7 @@ The project focuses on responsive design, secure authentication, reliable market
 - User-specific watchlist access
 
 ### 🔐 Authentication & Security
+
 - User registration and login
 - Secure session management
 - Protected application routes
@@ -37,6 +41,7 @@ The project focuses on responsive design, secure authentication, reliable market
 - Ownership checks for private resources
 
 ### 🌐 Market Data Integration
+
 - CoinGecko integration for cryptocurrency market data
 - Configurable demo and live crypto modes
 - Simulated stock prices for development
@@ -47,17 +52,17 @@ The project focuses on responsive design, secure authentication, reliable market
 
 ## 🛠️ Tech Stack
 
-| Category | Technologies |
-|---|---|
-| Frontend | React, TypeScript, Vite |
-| Styling | Tailwind CSS |
-| Backend | Node.js, Express, TypeScript |
-| Database | PostgreSQL |
-| ORM | Prisma |
-| Market Data | CoinGecko API, Demo Provider |
-| Testing | Automated unit and integration tests |
-| DevOps | Docker Compose, GitHub Actions |
-| Version Control | Git, GitHub |
+| Category        | Technologies                         |
+| --------------- | ------------------------------------ |
+| Frontend        | React, TypeScript, Vite              |
+| Styling         | Tailwind CSS                         |
+| Backend         | Node.js, Express, TypeScript         |
+| Database        | PostgreSQL                           |
+| ORM             | Prisma                               |
+| Market Data     | CoinGecko API, Demo Provider         |
+| Testing         | Automated unit and integration tests |
+| DevOps          | Docker Compose, GitHub Actions       |
+| Version Control | Git, GitHub                          |
 
 ## 🏗️ Architecture
 
@@ -174,3 +179,12 @@ GitHub: [@akanksha15sharma](https://github.com/akanksha15sharma)
 MarketPulse is an educational and portfolio project. Market data may be delayed, cached, unavailable, or simulated depending on provider configuration.
 
 The application does not provide investment advice or execute financial transactions.
+
+## Phase 7 — price alerts
+
+Signed-in users can manage private USD price targets and target-reached history at
+`/alerts`. This phase follows the explicit request to build alerts before portfolios.
+Only fresh, post-arm real CoinPaprika quotes can trigger an alert. Stock targets
+remain saved but blocked while stocks use simulated data. Apply the additive event
+provenance migration before running the feature. See [setup and semantics](docs/alerts.md)
+and [verification results](PHASE7-VERIFICATION.md). Work stops before Phase 8.

@@ -238,6 +238,11 @@ model AlertEvent {
   alertId String @db.Uuid
   activation Int
   observedPrice Decimal @db.Decimal(38, 18)
+  targetPrice Decimal? @db.Decimal(38, 18)
+  direction AlertDirection?
+  provider Provider?
+  mode DataMode?
+  fetchedAt DateTime? @db.Timestamptz(3)
   sourceAt DateTime @db.Timestamptz(3)
   triggeredAt DateTime @default(now()) @db.Timestamptz(3)
   alert PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)

@@ -36,6 +36,12 @@ export function AppLayout() {
             >
               Watchlists
             </NavLink>
+            <NavLink
+              to="/alerts"
+              className="text-slate-300 hover:text-teal-300"
+            >
+              Alerts
+            </NavLink>
             <Link to="/account" className="text-slate-300 hover:text-teal-300">
               Account
             </Link>

@@ -1,4 +1,5 @@
 import type { PrismaClient, Prisma } from '../../generated/prisma/client.js';
+import { evaluateQuote } from '../alerts/evaluation.js';
 import type { HistoryRange } from '@marketpulse/contracts';
 import {
   MarketDeferred,
@@ -64,9 +65,17 @@ export function createMarketRepository(db: PrismaClient): MarketStore {
     },
     async saveQuotes(rows) {
       await db.$transaction(async (tx) => {
-        for (const row of rows) {
+        // Stable quote/alert lock order across workers, even when provider row order differs.
+        for (const row of [...rows].sort((a, b) =>
+          `${a.assetId}:${a.provider}:${a.mode}`.localeCompare(
+            `${b.assetId}:${b.provider}:${b.mode}`,
+          ),
+        )) {
           // Atomic source-time guard protects against delayed workers and restarts.
-          await tx.$executeRaw`INSERT INTO latest_quotes ("assetId", provider, mode, currency, price, "changePercent", "sourceAt", "fetchedAt") VALUES (${row.assetId}::uuid, ${row.provider}::"Provider", ${row.mode}::"DataMode", 'USD', ${row.price}::numeric, ${row.changePercent}::numeric, ${new Date(row.sourceAt)}, ${new Date(row.fetchedAt)}) ON CONFLICT ("assetId", provider, mode, currency) DO UPDATE SET price = EXCLUDED.price, "changePercent" = EXCLUDED."changePercent", "sourceAt" = EXCLUDED."sourceAt", "fetchedAt" = EXCLUDED."fetchedAt" WHERE latest_quotes."sourceAt" < EXCLUDED."sourceAt"`;
+          const accepted = await tx.$queryRaw<
+            { assetId: string }[]
+          >`INSERT INTO latest_quotes ("assetId", provider, mode, currency, price, "changePercent", "sourceAt", "fetchedAt") VALUES (${row.assetId}::uuid, ${row.provider}::"Provider", ${row.mode}::"DataMode", 'USD', ${row.price}::numeric, ${row.changePercent}::numeric, ${new Date(row.sourceAt)}, ${new Date(row.fetchedAt)}) ON CONFLICT ("assetId", provider, mode, currency) DO UPDATE SET price = EXCLUDED.price, "changePercent" = EXCLUDED."changePercent", "sourceAt" = EXCLUDED."sourceAt", "fetchedAt" = EXCLUDED."fetchedAt" WHERE latest_quotes."sourceAt" < EXCLUDED."sourceAt" RETURNING "assetId"`;
+          if (accepted.length) await evaluateQuote(tx, row);
         }
       });
     },

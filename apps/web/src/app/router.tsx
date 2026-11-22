@@ -1,3 +1,5 @@
+import { AlertsPage } from '../pages/AlertsPage';
+import { alertsLoader, alertsAction } from '../features/alerts/actions';
 import { createBrowserRouter } from 'react-router';
 import { WatchlistsPage } from '../pages/WatchlistsPage';
 import {
@@ -34,6 +36,12 @@ export const router = createBrowserRouter([
         loader: watchlistsLoader,
         action: watchlistsAction,
         element: <WatchlistsPage />,
+      },
+      {
+        path: '/alerts',
+        loader: alertsLoader,
+        action: alertsAction,
+        element: <AlertsPage />,
       },
       { path: '/account', loader: accountLoader, element: <AccountPage /> },
       { path: '*', element: <NotFoundPage /> },

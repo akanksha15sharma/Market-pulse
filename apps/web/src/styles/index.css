@@ -844,3 +844,160 @@
   padding-top: 0.8rem;
   border-top: 1px solid #31565b;
 }
+
+/* Price alerts share the existing market panels and native form controls. */
+.alert-target-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-bottom: 1px solid #26354a;
+}
+.alert-target-form label {
+  display: grid;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 10rem;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+}
+.alert-target-form input {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+}
+.alert-target-form select {
+  width: 100%;
+  appearance: none;
+  border: 1px solid #475569;
+  border-radius: 0.6rem;
+  padding: 0.7rem 2rem 0.7rem 0.9rem;
+  color: #f1f5f9;
+  background: #0f172a
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4 3 3 3-3' fill='none' stroke='%2394a3b8' stroke-width='1.5'/%3E%3C/svg%3E")
+    no-repeat right 0.75rem center;
+}
+.alert-target-form > p {
+  width: 100%;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.alert-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+}
+.alert-card {
+  min-width: 0;
+  padding: 1.2rem;
+  border: 1px solid #26354a;
+  border-radius: 0.8rem;
+  background: #111e30;
+}
+.alert-card-top,
+.alert-event-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.alert-asset-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.alert-asset-title:hover {
+  color: #5eead4;
+}
+.alert-decimal {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.alert-card-top > div > p {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+.alert-status {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.alert-eligibility {
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.market-panel > .alert-eligibility {
+  margin-left: 1.5rem;
+  margin-right: 1.5rem;
+}
+.alert-current-price {
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.alert-reached {
+  color: #99f6e4;
+  margin-top: 0.8rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.alert-inline-actions,
+.alert-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+.alert-pagination {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #26354a;
+  font-size: 0.875rem;
+}
+.alert-event-list {
+  padding: 0 1.5rem 1rem;
+}
+.alert-event-list li {
+  border-top: 1px solid #26354a;
+  padding: 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.alert-event-heading {
+  margin-bottom: 0.5rem;
+}
+.alerts-page .market-tabs {
+  flex-wrap: wrap;
+}
+.alerts-page .market-tabs a {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.4rem;
+  color: #94a3b8;
+}
+.alerts-page .market-tabs a[aria-current='page'] {
+  background: #233448;
+  color: #ecfdf5;
+}
+.alerts-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+@media (max-width: 800px) {
+  .alert-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .alert-target-form,
+  .alert-cards {
+    padding: 1rem;
+  }
+  .alert-target-form label,
+  .alert-target-form > button {
+    flex-basis: 100%;
+  }
+  .nav-links {
+    flex-wrap: wrap;
+  }
+}
