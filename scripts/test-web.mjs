@@ -3,7 +3,13 @@ import { spawn } from 'node:child_process';
 // Run with the web tsconfig so tsx uses the same automatic JSX runtime as Vite.
 const child = spawn(
   process.execPath,
-  ['--import', 'tsx', '--test', 'tests/auth.test.tsx'],
+  [
+    '--import',
+    'tsx',
+    '--test',
+    'tests/auth.test.tsx',
+    'tests/markets.test.tsx',
+  ],
   {
     cwd: new URL('../apps/web/', import.meta.url),
     stdio: 'inherit',

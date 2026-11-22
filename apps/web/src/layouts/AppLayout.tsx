@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
 
 export function AppLayout() {
   return (
@@ -16,11 +16,20 @@ export function AppLayout() {
         >
           <Link
             to="/"
-            className="text-xl font-semibold tracking-tight text-teal-300"
+            className="brand text-xl font-semibold tracking-tight text-teal-300"
           >
+            <span className="brand-symbol" aria-hidden="true">
+              M
+            </span>{' '}
             MarketPulse
           </Link>
-          <div className="flex gap-5 text-sm">
+          <div className="nav-links flex gap-5 text-sm">
+            <NavLink
+              to="/markets"
+              className="text-slate-300 hover:text-teal-300"
+            >
+              Markets
+            </NavLink>
             <Link to="/account" className="text-slate-300 hover:text-teal-300">
               Account
             </Link>
@@ -30,11 +39,12 @@ export function AppLayout() {
           </div>
         </nav>
       </header>
-      <main id="main" className="mx-auto max-w-6xl px-6 py-16">
+      <main id="main" className="mx-auto max-w-6xl px-6 py-10">
         <Outlet />
       </main>
       <footer className="mx-auto max-w-6xl px-6 py-8 text-sm text-slate-400">
-        A software engineering portfolio project.
+        MarketPulse · A software engineering portfolio project. USD only. No
+        trade execution.
       </footer>
     </div>
   );

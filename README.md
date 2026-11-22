@@ -1,9 +1,9 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 4 market backend.
+Live Crypto & Stock Tracker with Price Alerts — Phase 5 market UI.
 Registration, sign-in, PostgreSQL sessions and account pages are implemented.
-The market API and cache worker are implemented; market UI, portfolios and alerts
-are not implemented yet.
+The market API, cache worker, dashboard and historical price charts are implemented.
+Watchlists, portfolios and alerts remain in later phases.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
 ## Requirements
@@ -92,4 +92,11 @@ See [Phase 4 market backend](docs/market-backend.md) for cache-only REST endpoin
 worker behavior, quota policy and the additive migration. Both asset types default
 to clearly labeled synthetic data; real crypto is explicitly configured server-side.
 Stocks remain demo-only. npm test includes fixture-based market tests; PostgreSQL
-coverage uses npm run test:markets:db. No market UI is included before Phase 5.
+coverage uses npm run test:markets:db. The Phase 5 market UI consumes these endpoints.
+
+## Market dashboard
+
+Browse `/markets` (also available at `/`) for crypto and simulated stock listings,
+search, price cards and source/freshness labels. Select an asset for historical
+charts with 1D, 7D, 1M and 1Y ranges and keyboard-accessible observation inspection.
+See [market UI behavior and verification](docs/market-ui.md). Phase 6 has not started.

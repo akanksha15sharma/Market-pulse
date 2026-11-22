@@ -1,0 +1,138 @@
+import { z } from 'zod';
+import {
+  assetSchema,
+  historyResponseSchema,
+  quoteSchema,
+  type HistoryRange,
+} from '@marketpulse/contracts';
+
+const catalogSchema = z.object({
+  assets: z.array(assetSchema),
+  total: z.number(),
+});
+const quotesSchema = z.object({ quotes: z.array(quoteSchema) });
+const statusSchema = z.object({
+  cryptoMode: z.enum(['demo', 'coingecko']),
+  stockMode: z.literal('demo'),
+  refreshSeconds: z.object({ crypto: z.number(), stocks: z.number() }),
+  workerEnabled: z.boolean(),
+  attribution: z.string(),
+});
+export type History = z.infer<typeof historyResponseSchema>;
+export type Overview = Awaited<ReturnType<typeof loadOverview>>;
+export class MarketRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly retryMs = 60_000,
+  ) {
+    super(message);
+  }
+}
+export function retryDelay(value: string | null, now = Date.now()) {
+  const seconds = value === null ? NaN : Number(value);
+  const delay = Number.isFinite(seconds)
+    ? seconds * 1000
+    : Date.parse(value ?? '') - now;
+  return Math.max(60_000, Number.isFinite(delay) ? delay : 60_000);
+}
+let readBlockedUntil = 0;
+async function read<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  signal: AbortSignal,
+) {
+  if (Date.now() < readBlockedUntil)
+    throw new MarketRequestError(
+      'Request limit reached. Refresh will resume automatically.',
+      readBlockedUntil - Date.now(),
+    );
+  const response = await fetch(`/api/v1${path}`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+  });
+  if (!response.ok) {
+    if (response.status === 429) {
+      readBlockedUntil =
+        Date.now() + retryDelay(response.headers.get('Retry-After'));
+      throw new MarketRequestError(
+        'Request limit reached. Refresh will resume automatically.',
+        readBlockedUntil - Date.now(),
+      );
+    }
+    if (response.status === 401)
+      throw new MarketRequestError(
+        'Your session expired. Sign in again to load history.',
+      );
+    if (response.status === 404)
+      throw new MarketRequestError('Asset not found in the catalog.');
+    throw new MarketRequestError(
+      'Market data is temporarily unavailable. Please try again.',
+    );
+  }
+  // 202 contains the same typed history response, with refresh=pending.
+  return schema.parse(await response.json());
+}
+export async function loadOverview(signal: AbortSignal) {
+  const [catalog, prices, status] = await Promise.all([
+    read('/assets?limit=15', catalogSchema, signal),
+    read('/quotes', quotesSchema, signal),
+    read('/market-status', statusSchema, signal),
+  ]);
+  return { assets: catalog.assets, quotes: prices.quotes, status };
+}
+export async function loadAsset(id: string, signal: AbortSignal) {
+  const [detail, prices, status] = await Promise.all([
+    read(
+      `/assets/${encodeURIComponent(id)}`,
+      z.object({ asset: assetSchema }),
+      signal,
+    ),
+    read(`/quotes?assetIds=${encodeURIComponent(id)}`, quotesSchema, signal),
+    read('/market-status', statusSchema, signal),
+  ]);
+  return { asset: detail.asset, quote: prices.quotes[0], status };
+}
+
+// Keep range changes and pending polling within the API's six history reads/minute.
+let nextHistoryAt = 0;
+let historyQueue = Promise.resolve();
+export async function loadHistory(
+  id: string,
+  range: HistoryRange,
+  signal: AbortSignal,
+) {
+  const previous = historyQueue;
+  let release!: () => void;
+  historyQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    if (signal.aborted)
+      throw new DOMException('Request cancelled', 'AbortError');
+    const wait = Math.max(0, nextHistoryAt - Date.now());
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(new DOMException('Request cancelled', 'AbortError'));
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      }, wait);
+      if (signal.aborted) abort();
+      else signal.addEventListener('abort', abort, { once: true });
+    });
+    nextHistoryAt = Date.now() + 10_100;
+    return await read(
+      `/assets/${encodeURIComponent(id)}/history?range=${range}`,
+      historyResponseSchema,
+      signal,
+    );
+  } finally {
+    release();
+  }
+}
+export const historyInterval = (data: History | null) =>
+  data?.refresh === 'pending' ? 20_000 : 60_000;
