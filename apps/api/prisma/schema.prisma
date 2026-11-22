@@ -1,0 +1,303 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AssetType {
+  CRYPTO
+  STOCK
+}
+enum DataMode {
+  REAL
+  DEMO
+}
+enum Provider {
+  COINGECKO
+  TWELVE_DATA
+  DEMO
+}
+enum TokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+enum TradeSide {
+  BUY
+  SELL
+}
+enum AlertDirection {
+  ABOVE
+  BELOW
+}
+enum AlertStatus {
+  ACTIVE
+  PAUSED
+  TRIGGERED
+}
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  EXPIRED
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique @db.VarChar(254)
+  passwordHash String @db.Text
+  displayName String @db.VarChar(100)
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  emailAlertsEnabled Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  sessions Session[]
+  authTokens AuthToken[]
+  watchlists Watchlist[]
+  portfolios Portfolio[]
+  alerts PriceAlert[]
+  notifications Notification[]
+  @@map("users")
+}
+
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  tokenHash String @unique @db.VarChar(128)
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model AuthToken {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  tokenHash String @unique @db.VarChar(128)
+  purpose TokenPurpose
+  expiresAt DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("auth_tokens")
+}
+
+model Asset {
+  id String @id @default(uuid()) @db.Uuid
+  key String @unique @db.VarChar(100)
+  type AssetType
+  symbol String @db.VarChar(20)
+  name String @db.VarChar(100)
+  exchange String? @db.VarChar(50)
+  quoteCurrency String @default("USD") @db.VarChar(3)
+  isDemoOnly Boolean @default(false)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  mappings AssetProviderMapping[]
+  quotes LatestQuote[]
+  history HistoricalBar[]
+  watchlistItems WatchlistItem[]
+  transactions Transaction[]
+  alerts PriceAlert[]
+  @@index([type, isActive])
+  @@map("assets")
+}
+
+model AssetProviderMapping {
+  id String @id @default(uuid()) @db.Uuid
+  assetId String @db.Uuid
+  provider Provider
+  providerAssetId String @db.VarChar(100)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@unique([provider, providerAssetId])
+  @@unique([assetId, provider])
+  @@map("asset_provider_mappings")
+}
+
+model LatestQuote {
+  assetId String @db.Uuid
+  provider Provider
+  mode DataMode
+  currency String @default("USD") @db.VarChar(3)
+  price Decimal @db.Decimal(38, 18)
+  changePercent Decimal? @db.Decimal(18, 8)
+  sourceAt DateTime @db.Timestamptz(3)
+  fetchedAt DateTime @default(now()) @db.Timestamptz(3)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@id([assetId, provider, mode, currency])
+  @@map("latest_quotes")
+}
+
+model HistoricalBar {
+  assetId String @db.Uuid
+  provider Provider
+  mode DataMode
+  currency String @default("USD") @db.VarChar(3)
+  interval String @db.VarChar(10)
+  timestamp DateTime @db.Timestamptz(3)
+  close Decimal @db.Decimal(38, 18)
+  volume Decimal? @db.Decimal(38, 18)
+  expiresAt DateTime @db.Timestamptz(3)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@id([assetId, provider, mode, currency, interval, timestamp])
+  @@index([expiresAt])
+  @@map("historical_bars")
+}
+
+model Watchlist {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name String @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items WatchlistItem[]
+  @@index([userId])
+  @@map("watchlists")
+}
+
+model WatchlistItem {
+  watchlistId String @db.Uuid
+  assetId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  watchlist Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@id([watchlistId, assetId])
+  @@index([assetId])
+  @@map("watchlist_items")
+}
+
+model Portfolio {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name String @db.VarChar(100)
+  mode DataMode
+  baseCurrency String @default("USD") @db.VarChar(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  @@unique([id, mode])
+  @@index([userId])
+  @@map("portfolios")
+}
+
+model Transaction {
+  id String @id @default(uuid()) @db.Uuid
+  portfolioId String @db.Uuid
+  assetId String @db.Uuid
+  mode DataMode
+  side TradeSide
+  quantity Decimal @db.Decimal(38, 18)
+  unitPrice Decimal @db.Decimal(38, 18)
+  fee Decimal @default(0) @db.Decimal(38, 18)
+  executedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  portfolio Portfolio @relation(fields: [portfolioId, mode], references: [id, mode], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@index([portfolioId, executedAt])
+  @@index([assetId])
+  @@map("transactions")
+}
+
+model PriceAlert {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  assetId String @db.Uuid
+  provider Provider
+  mode DataMode
+  currency String @default("USD") @db.VarChar(3)
+  direction AlertDirection
+  threshold Decimal @db.Decimal(38, 18)
+  status AlertStatus @default(ACTIVE)
+  emailEnabled Boolean @default(false)
+  activation Int @default(1)
+  armedAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  events AlertEvent[]
+  @@index([assetId, status, provider, mode])
+  @@index([userId])
+  @@map("price_alerts")
+}
+
+model AlertEvent {
+  id String @id @default(uuid()) @db.Uuid
+  alertId String @db.Uuid
+  activation Int
+  observedPrice Decimal @db.Decimal(38, 18)
+  sourceAt DateTime @db.Timestamptz(3)
+  triggeredAt DateTime @default(now()) @db.Timestamptz(3)
+  alert PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  emailDelivery EmailDelivery?
+  @@unique([alertId, activation])
+  @@map("alert_events")
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  alertEventId String? @db.Uuid
+  message String @db.VarChar(1000)
+  readAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: Cascade)
+  @@unique([userId, alertEventId])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model EmailDelivery {
+  id String @id @default(uuid()) @db.Uuid
+  alertEventId String @unique @db.Uuid
+  recipient String @db.VarChar(254)
+  status DeliveryStatus @default(PENDING)
+  attempts Int @default(0)
+  providerMessageId String? @db.VarChar(200)
+  nextRetryAt DateTime? @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  alertEvent AlertEvent @relation(fields: [alertEventId], references: [id], onDelete: Cascade)
+  @@index([status, nextRetryAt])
+  @@map("email_deliveries")
+}
+
+model OutboxEvent {
+  id String @id @default(uuid()) @db.Uuid
+  type String @db.VarChar(100)
+  payload Json @db.JsonB
+  processedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([processedAt, createdAt])
+  @@map("outbox_events")
+}
+
+model ProviderUsage {
+  provider Provider
+  category String @db.VarChar(50)
+  windowStart DateTime @db.Timestamptz(3)
+  windowEnd DateTime @db.Timestamptz(3)
+  reserved Int @default(0)
+  consumed Int @default(0)
+  @@id([provider, category, windowStart, windowEnd])
+  @@map("provider_usage")
+}
+
+model SchedulerLease {
+  key String @id @db.VarChar(150)
+  owner String @db.VarChar(100)
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([expiresAt])
+  @@map("scheduler_leases")
+}

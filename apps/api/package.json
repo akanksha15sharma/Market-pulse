@@ -5,19 +5,31 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --watch-preserve-output --import tsx src/server.ts",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/server.js"
+    "build": "npm run db:generate && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tools.json",
+    "start": "node dist/server.js",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed",
+    "test:db": "node --import tsx --test --test-concurrency=1 tests/integration/database.test.ts"
   },
   "dependencies": {
     "@marketpulse/contracts": "*",
     "express": "^5.1.0",
     "dotenv": "^17.2.3",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "@prisma/client": "7.10.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/node": "^22.18.0",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "prisma": "7.10.1",
+    "@types/pg": "^8.15.6"
   }
 }

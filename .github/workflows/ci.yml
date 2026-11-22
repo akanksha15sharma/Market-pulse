@@ -13,6 +13,8 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: npm install
+      - run: npm run db:generate
+      - run: npm run db:validate
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
@@ -22,6 +24,24 @@ jobs:
           docker compose config --quiet
           docker compose up -d --wait
           docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
+      - name: Apply application migrations and seed twice
+        env:
+          DATABASE_URL: postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse
+          DIRECT_DATABASE_URL: postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse
+        run: |
+          npm run db:deploy
+          npm run db:seed
+          npm run db:seed
+      - name: Prepare isolated test database
+        run: docker compose exec -T postgres createdb -U marketpulse marketpulse_test
+      - name: Migrate and test database constraints
+        env:
+          DATABASE_URL: postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test
+          DIRECT_DATABASE_URL: postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test
+          TEST_DATABASE_URL: postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test
+        run: |
+          npm run db:deploy
+          npm run test:db
       - name: Stop PostgreSQL
         if: always()
         run: docker compose down

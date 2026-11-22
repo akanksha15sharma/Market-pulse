@@ -12,14 +12,21 @@
     "npm": ">=9"
   },
   "scripts": {
-    "dev": "npm run build -w @marketpulse/contracts && node scripts/dev.mjs",
+    "dev": "npm run db:generate -w @marketpulse/api && npm run build -w @marketpulse/contracts && node scripts/dev.mjs",
     "build": "npm run build -w @marketpulse/contracts && npm run build -w @marketpulse/api && npm run build -w @marketpulse/web",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "npm run build -w @marketpulse/contracts && npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run db:generate -w @marketpulse/api && npm run build -w @marketpulse/contracts && npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:up": "docker compose up -d --wait",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:generate": "npm run db:generate -w @marketpulse/api",
+    "db:validate": "npm run db:validate -w @marketpulse/api",
+    "db:migrate": "npm run db:migrate -w @marketpulse/api",
+    "db:deploy": "npm run db:deploy -w @marketpulse/api",
+    "db:status": "npm run db:status -w @marketpulse/api",
+    "db:seed": "npm run db:seed -w @marketpulse/api",
+    "test:db": "npm run test:db -w @marketpulse/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

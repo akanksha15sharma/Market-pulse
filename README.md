@@ -1,6 +1,6 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 1 foundation.
+Live Crypto & Stock Tracker with Price Alerts — Phase 2 database foundation (verification pending).
 No market, authentication, portfolio or alert features are implemented yet.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
@@ -23,12 +23,13 @@ Frontend: http://127.0.0.1:5173. API: http://127.0.0.1:3001/api/v1/health/live.
 Vite proxies `/api` to Express, so the browser uses the same origin. Change
 `API_PROXY_TARGET` if you change the API port. Environment files are optional for
 Phase 1 defaults. Database credentials are local-only; keep custom root Compose
-values and the API DATABASE_URL consistent. No database connection/migrations yet.
+values and the API DATABASE_URL consistent. Prisma migrations and catalog seeding are described in [database setup](docs/database.md).
 `npm run db:down` stops PostgreSQL while retaining the named data volume.
 
 The root dev command builds shared contracts first, then watches contracts, API and
 frontend together. Shared runtime exports live in `dist`, not TypeScript source.
 A fresh clone requires the root build/dev command before standalone API startup.
+The root command generates Prisma Client before starting the watchers.
 The API uses Node 22 native watch mode with the existing `tsx` loader. It watches
 imported API modules and shared contracts without the Unix IPC listener required
 by the `tsx watch` CLI. Environment-file changes require a manual restart.
@@ -63,3 +64,9 @@ preserve them unchanged. CI checks formatting, lint, types, builds and Compose s
 - `docs`: approved Phase 0 planning; future feature folders arrive with their phases.
 
 No provider keys are required. Never put secrets in frontend environment variables.
+
+## Database development
+
+See [database setup and relationships](docs/database.md) for migrations, seeding and
+isolated PostgreSQL integration tests. Authentication tables exist, but there are no
+Phase 3 handlers or auth endpoints. Provider quotes and user accounts are not seeded.

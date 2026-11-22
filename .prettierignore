@@ -8,3 +8,4 @@ docs/data-providers.md
 docs/scope.md
 docs/deployment.md
 docs/decisions/0001-phase-0-baseline.md
+apps/api/src/generated/
