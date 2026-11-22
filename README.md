@@ -1,6 +1,6 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 2 database foundation (verification pending).
+Live Crypto & Stock Tracker with Price Alerts — Phase 2 database foundation (locally verified).
 No market, authentication, portfolio or alert features are implemented yet.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
@@ -45,8 +45,8 @@ npm run start -w @marketpulse/api
 npm run preview -w @marketpulse/web
 ```
 
-CI currently runs `npm install`. Once registry access is available, generate and commit
-`package-lock.json`, then switch CI to `npm ci` with npm caching.
+The reviewed `package-lock.json` is committed. CI runs `npm ci` with npm caching;
+use `npm ci` for a fresh checkout.
 Build order is contracts, API, web.
 Outputs: `packages/contracts/dist`, `apps/api/dist`, `apps/web/dist`.
 Vite preview is only a local bundle preview: it does not proxy API requests. A

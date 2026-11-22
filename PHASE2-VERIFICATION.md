@@ -1,32 +1,41 @@
 # Phase 2 verification — 2026-11-22
 
-Status: database implementation authored; runtime acceptance incomplete.
+Status: locally verified, based on the user's reported PostgreSQL and application
+checks. Lockfile review and the checks identified below were performed in this
+session. Phase 3 has not started and requires separate approval.
 
-| Check                                | Observed result                                                              |
-| ------------------------------------ | ---------------------------------------------------------------------------- |
-| ESLint                               | Passed                                                                       |
-| Prettier                             | Passed                                                                       |
-| git diff --check                     | Passed                                                                       |
-| Phase 0 documents                    | Unchanged                                                                    |
-| Schema/migration static review       | 18 model tables match migration tables; FK arities match                     |
-| Original untracked lockfile          | Preserved byte-for-byte; backup in /tmp/marketpulse-phase1-package-lock.json |
-| npm install                          | Failed EAI_AGAIN resolving adapter-pg registry metadata                      |
-| Offline lockfile resolution          | Failed ENOTCACHED for adapter-pg                                             |
-| Docker Compose config                | Passed                                                                       |
-| Docker daemon                        | EPERM connecting to /var/run/docker.sock                                     |
-| Prisma generate/validate/deploy/seed | Failed: Prisma CLI not installed                                             |
-| PostgreSQL integration tests         | Failed before execution: adapter-pg unavailable                              |
-| Typecheck / build                    | Blocked by Prisma generation failure                                         |
-| CI                                   | Updated, not executed remotely                                               |
+## Verification results
 
-No migration applied, no database reset, no seed rows inserted and no successful
-database-test claim. No authentication endpoints or Phase 3 behavior added.
-The initial migration is authored SQL, pending Prisma and PostgreSQL validation.
+| Check                                    | Result and evidence                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Application and test database migrations | Applied successfully to both local PostgreSQL databases, reported by user                                    |
+| Catalog seed                             | Succeeded locally, reported by user                                                                          |
+| PostgreSQL integration tests             | All 4 passed locally, reported by user                                                                       |
+| Lint, typecheck and production build     | Passed locally, reported by user; lint independently passed again in this review                             |
+| Lockfile/manifests                       | All four root/workspace manifests match their lock entries                                                   |
+| Direct dependency resolutions            | Satisfy manifest ranges; Prisma CLI/client/adapter all 7.10.1                                                |
+| Sources/integrity                        | 468 resolved entries use HTTPS registry.npmjs.org and SHA-512 integrity; no credential-bearing source URLs   |
+| npm ci compatibility                     | Offline dry run passed, then clean offline installation succeeded (406 packages), lifecycle scripts disabled |
+| Formatting and diff checks               | Passed in this session                                                                                       |
+| Phase 0 documents                        | Unchanged                                                                                                    |
+| CI                                       | Uses npm ci and lockfile-backed npm caching; remote execution not verified                                   |
 
-See docs/database.md for exact setup, test isolation and remaining verification.
-Once registry/daemon access is available: install, regenerate/commit the lockfile,
-generate client, validate schema, deploy to empty PostgreSQL, seed twice, migrate a
-separate local marketpulse_test database, run integration tests, compare Prisma
-schema/migration output, then rerun lint, format, typecheck and build. Switch CI to
-npm ci after the consistent lockfile is committed. Do not start Phase 3 until these
-checks are complete and approved.
+The committed package-lock.json is the user-generated Phase 2 lockfile, reviewed
+without regenerating it or changing dependency versions. CI consumes it using npm ci.
+Generated Prisma client code, environment files and database contents are not
+committed. No applied migrations were edited.
+
+## Earlier environment limitations
+
+The implementation session could not resolve npm registry metadata or connect to
+the Docker daemon. Those failures explain the previous incomplete record, rather
+than contradicting the user's subsequent successful local verification. Database
+migrations, seed and tests were not independently rerun during this review.
+
+An offline clean installation succeeded with npm ci --offline --ignore-scripts
+--no-audit --no-fund. It verifies cached package installation and lock compatibility,
+not lifecycle scripts, database connectivity or a network-enabled clean installation.
+
+See [database setup](docs/database.md) for relationships and repeatable local commands.
+No known Phase 2 functional blocker remains based on the reported local results and
+this lockfile review. Remote CI and deployment remain unverified.

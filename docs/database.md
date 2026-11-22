@@ -1,8 +1,9 @@
 # Phase 2 — PostgreSQL and Prisma
 
-Status: implementation authored; installation and PostgreSQL verification blocked
-in this execution environment. Do not treat the migration as applied or validated.
-Phase 0 documents are unchanged. No Phase 3 authentication behavior is implemented.
+Status: locally verified. The user reports migrations applied to both PostgreSQL
+databases, successful seeding, all four database tests passing, and lint, typecheck
+and build passing. See [verification evidence](../PHASE2-VERIFICATION.md) for attribution
+and lockfile review. Phase 0 documents are unchanged; Phase 3 has not started.
 
 ## Technical decisions
 
@@ -62,8 +63,9 @@ cross-user authorization or alert-processing correctness.
 
 apps/api/prisma/migrations/20261122000100_initial_schema/migration.sql is an authored
 initial PostgreSQL migration, including indexes, foreign keys, checks and demo-mode
-triggers. It has not been produced by a successful migrate dev run in this environment.
-Apply only to an empty development/test database after installation and review.
+triggers. The user reports it successfully applied to both local PostgreSQL databases.
+For a new environment, apply to an empty development/test database after installation
+and review.
 Before release, validate with prisma validate, deploy against a clean PostgreSQL
 instance and compare the resulting schema with Prisma using migrate diff. Never
 edit an applied migration; create a subsequent migration when changing deployed data.
@@ -119,16 +121,16 @@ provider mappings, unique/FK constraints, deletion cascades, decimal round trips
 positive amounts, mode separation, and duplicate alert events. CI now includes these
 steps, but has not been run remotely. All test data is synthetic.
 
-## Lockfile and verification blocker
+## Lockfile and reproducible installation
 
-The pre-existing Phase 1 lockfile has been preserved, with a backup at
-/tmp/marketpulse-phase1-package-lock.json during this session. New Prisma dependencies
-cannot be resolved from the incomplete cache. npm install fails EAI_AGAIN, and offline
-lockfile resolution fails ENOTCACHED for adapter-pg. Do not fabricate lock entries or
-commit a stale lockfile as if it resolves Phase 2 dependencies. Once registry access
-is available, regenerate the root package-lock.json with npm install, verify npm ci,
-then commit it and switch CI from npm install to npm ci plus npm caching.
+The generated root package-lock.json now matches all workspace manifests, pins the
+Prisma CLI/client/adapter to 7.10.1 and records npm registry sources with SHA-512
+integrity. It is committed for reproducibility. CI uses npm ci with npm caching;
+use npm ci for a fresh checkout. An offline npm ci dry run and a subsequent clean offline installation (406 packages)
+passed during review, both with lifecycle scripts disabled. This verifies cached
+package installation, not lifecycle hooks or database connectivity.
 
-Docker Compose configuration can be checked locally, but Docker daemon access fails
-EPERM at /var/run/docker.sock. Therefore client generation, schema validation, actual
-migration application, seed execution and PostgreSQL tests remain unverified.
+Earlier registry/Docker restrictions blocked the initial agent verification. The
+user subsequently completed local migration, seed, database-test and application
+checks. The review did not independently rerun database operations, and remote CI
+has not yet been observed. No Phase 3 behavior is included.
