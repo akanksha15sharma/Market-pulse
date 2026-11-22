@@ -1,13 +1,96 @@
 import express from 'express';
+import type { ErrorRequestHandler } from 'express';
+import { randomUUID } from 'node:crypto';
+import { ZodError } from 'zod';
 import { healthResponseSchema } from '@marketpulse/contracts';
+import { authConfig, type AuthConfig } from './config/env.js';
+import { HttpError } from './lib/http-error.js';
+import { authRoutes } from './modules/auth/routes.js';
+import { sessionToken } from './modules/auth/security.js';
+import { createAuthService, type AuthService } from './modules/auth/service.js';
+import { createDatabaseClient } from './db/client.js';
+import { authMailer } from './email/auth-mailer.js';
 
-export const app = express();
-app.disable('x-powered-by');
-app.get('/api/v1/health/live', (_req, res) => {
-  res.json(
-    healthResponseSchema.parse({ status: 'ok', service: 'marketpulse-api' }),
-  );
+export function createApp(auth: AuthService, config: AuthConfig) {
+  const app = express();
+  app.disable('x-powered-by');
+  // Trust no forwarded client IPs by default; configure a known proxy at deployment.
+  app.use((req, res, next) => {
+    res.set({
+      'X-Request-ID': randomUUID(),
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    });
+    if (config.secure) res.set('Strict-Transport-Security', 'max-age=31536000');
+    if (
+      (req.get('origin') && req.get('origin') !== config.origin) ||
+      req.get('sec-fetch-site') === 'cross-site' ||
+      (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+        req.get('origin') !== config.origin)
+    )
+      return next(new HttpError(403, 'Request origin is not allowed'));
+    next();
+  });
+  app.use(express.json({ limit: '16kb', type: 'application/json' }));
+  app.get('/api/v1/health/live', (_req, res) => {
+    res.json(
+      healthResponseSchema.parse({ status: 'ok', service: 'marketpulse-api' }),
+    );
+  });
+  app.use('/api/v1/auth', authRoutes(auth, config));
+  app.get('/api/v1/private/profile', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      user: await auth.me(sessionToken(req, config)),
+      message: 'Authenticated MarketPulse account',
+    });
+  });
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+  const errors: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
+    void _next;
+    if (error instanceof ZodError) {
+      res
+        .status(400)
+        .json({ error: 'Invalid input', fields: error.flatten().fieldErrors });
+      return;
+    }
+    if (error instanceof HttpError) {
+      if (error.status === 429) res.set('Retry-After', '3600');
+      if (error.status === 503) res.set('Retry-After', '30');
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    const status =
+      error && typeof error === 'object' && 'status' in error
+        ? Number(error.status)
+        : 500;
+    res.status(status === 413 ? 413 : status === 400 ? 400 : 500).json({
+      error:
+        status === 413
+          ? 'Request too large'
+          : status === 400
+            ? 'Invalid JSON'
+            : 'Request failed',
+      requestId: res.getHeader('X-Request-ID'),
+    });
+    // Never log bodies, cookies, database URLs or raw exception messages here.
+  };
+  app.use(errors);
+  return app;
+}
+// Lazy initialization keeps process liveness independent of DATABASE_URL or PostgreSQL.
+let service: AuthService | undefined;
+const lazyAuth = new Proxy({} as AuthService, {
+  get(_target, key: keyof AuthService) {
+    service ??= createAuthService(
+      createDatabaseClient(),
+      authConfig,
+      authMailer,
+    );
+    return service[key];
+  },
 });
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
+export const app = createApp(lazyAuth, authConfig);

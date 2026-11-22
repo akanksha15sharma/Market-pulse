@@ -301,3 +301,13 @@ model SchedulerLease {
   @@index([expiresAt])
   @@map("scheduler_leases")
 }
+
+model AuthRateLimit {
+  key String @db.VarChar(64)
+  windowStart DateTime @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  count Int @default(1)
+  @@id([key, windowStart])
+  @@index([expiresAt])
+  @@map("auth_rate_limits")
+}

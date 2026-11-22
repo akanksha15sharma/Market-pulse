@@ -14,7 +14,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:seed": "prisma db seed",
-    "test:db": "node --import tsx --test --test-concurrency=1 tests/integration/database.test.ts"
+    "test:db": "node --import tsx --test --test-concurrency=1 tests/integration/database.test.ts",
+    "test:auth": "node --import tsx --test --test-concurrency=1 tests/unit/auth.test.ts",
+    "test:auth:db": "node --import tsx --test --test-concurrency=1 tests/integration/auth.test.ts"
   },
   "dependencies": {
     "@marketpulse/contracts": "*",
