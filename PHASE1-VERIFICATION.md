@@ -34,3 +34,67 @@ with npm caching. No Phase 2 work has begun.
    transmit this repository to a prohibited organization or endpoint.
 
 Phase 1 should not be described as fully verified until these checks pass.
+
+## Follow-up diagnosis
+
+Rechecked on 2026-11-22 without changing dependency declarations or prior commits.
+
+- npm registry configuration is the default https://registry.npmjs.org/.
+- getent cannot resolve the registry; curl fails with resolver error 6; a fresh
+  npm install with no retries fails EAI_AGAIN.
+- Direct Python TCP and UDP socket creation both fail EPERM. Node localhost listen
+  also fails EPERM. This environment therefore blocks networking and server binding,
+  not merely a particular npm hostname. No resolver or registry workaround applied.
+- sudo -n true fails because the no-new-privileges flag prevents root escalation.
+- Docker is absent. Local apt indexes list Ubuntu 26.04 candidates docker.io
+  29.1.3-0ubuntu4.1 and docker-compose-v2 2.40.3+ds1-0ubuntu1. This is package
+  availability evidence, not a successful install or proof of daemon support here.
+- Reattempted lint, typecheck, build, dev and db:up: still blocked by missing project
+  dependencies/Docker. Formatting passes via the cached Prettier runner.
+- Installation, lockfile generation, HTTP smoke tests and database verification remain
+  incomplete. Do not label Phase 1 complete or begin Phase 2.
+
+### Host-terminal commands
+
+Run these outside the restricted execution environment, on an Ubuntu host with
+network access, sudo and systemd. Do not run npm as root. Ubuntu package sources:
+[docker.io](https://packages.ubuntu.com/en/resolute/docker.io),
+[docker-compose-v2](https://packages.ubuntu.com/en/resolute/docker-compose-v2).
+
+```sh
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
+sudo docker version
+sudo docker compose version
+cd ~/marketpulse
+sudo docker compose config --quiet
+sudo docker compose up -d --wait
+sudo docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1;"'
+```
+
+If Docker daemon startup fails in a managed container, install/run Docker on the
+host rather than assuming sudo alone fixes container capability restrictions.
+No Docker-group membership changes are required with the sudo commands above.
+
+```sh
+cd ~/marketpulse
+npm install
+npm run lint
+npm run format:check
+npm run typecheck
+npm run build
+npm run dev
+```
+
+From a second terminal, while dev is running:
+
+```sh
+curl --fail http://127.0.0.1:3001/api/v1/health/live
+curl --fail http://127.0.0.1:5173/api/v1/health/live
+```
+
+Open http://127.0.0.1:5173 and an unknown path in a browser. Stop development,
+start the compiled API with npm run start -w @marketpulse/api and check liveness
+again. After install/checks succeed, commit package-lock.json, switch CI to npm ci
+with npm caching, and verify a clean npm ci/build before claiming completion.
