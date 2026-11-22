@@ -1,4 +1,9 @@
 import { createBrowserRouter } from 'react-router';
+import { WatchlistsPage } from '../pages/WatchlistsPage';
+import {
+  watchlistsAction,
+  watchlistsLoader,
+} from '../features/watchlists/actions';
 import { AppLayout } from '../layouts/AppLayout';
 import { MarketDashboardPage } from '../pages/MarketDashboardPage';
 import { AssetDetailPage } from '../pages/AssetDetailPage';
@@ -24,6 +29,12 @@ export const router = createBrowserRouter([
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
       { path: '/reset-password', element: <ResetPasswordPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
+      {
+        path: '/watchlists',
+        loader: watchlistsLoader,
+        action: watchlistsAction,
+        element: <WatchlistsPage />,
+      },
       { path: '/account', loader: accountLoader, element: <AccountPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

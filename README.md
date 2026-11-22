@@ -1,9 +1,9 @@
 # MarketPulse
 
-Live Crypto & Stock Tracker with Price Alerts — Phase 5 market UI.
+Live Crypto & Stock Tracker with Price Alerts — Phase 6 watchlists.
 Registration, sign-in, PostgreSQL sessions and account pages are implemented.
 The market API, cache worker, dashboard and historical price charts are implemented.
-Watchlists, portfolios and alerts remain in later phases.
+Private watchlists are implemented. Portfolios and alerts remain in later phases.
 See [Phase 0 decisions](docs/README.md) for scope and data-mode limitations.
 
 ## Requirements
@@ -99,4 +99,13 @@ coverage uses npm run test:markets:db. The Phase 5 market UI consumes these endp
 Browse `/markets` (also available at `/`) for crypto and simulated stock listings,
 search, price cards and source/freshness labels. Select an asset for historical
 charts with 1D, 7D, 1M and 1Y ranges and keyboard-accessible observation inspection.
-See [market UI behavior and verification](docs/market-ui.md). Phase 6 has not started.
+See [market UI behavior and verification](docs/market-ui.md). Watchlists are available in Phase 6.
+
+## Watchlists
+
+Signed-in users can manage private lists at `/watchlists`: create, rename, delete,
+and add or remove catalog crypto and stocks. Saved assets use existing cached USD
+quotes with source, freshness and simulated-data labels. Limits are five lists per
+user and twenty assets per list. Existing PostgreSQL tables are reused; no new
+migration is required. See [watchlist API, setup and acceptance](docs/watchlists.md)
+and [Phase 6 verification](PHASE6-VERIFICATION.md). Phase 7 has not started.

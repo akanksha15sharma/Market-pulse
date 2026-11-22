@@ -1,4 +1,9 @@
 import express from 'express';
+import { watchlistRoutes } from './modules/watchlists/routes.js';
+import {
+  createWatchlistService,
+  type WatchlistService,
+} from './modules/watchlists/service.js';
 import type { ErrorRequestHandler } from 'express';
 import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
@@ -18,6 +23,7 @@ export function createApp(
   auth: AuthService,
   config: AuthConfig,
   market?: MarketService,
+  watchlists?: WatchlistService,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -46,6 +52,8 @@ export function createApp(
     );
   });
   app.use('/api/v1/auth', authRoutes(auth, config));
+  if (watchlists)
+    app.use('/api/v1/watchlists', watchlistRoutes(watchlists, auth, config));
   if (market) app.use('/api/v1', marketRoutes(market, auth, config));
   app.get('/api/v1/private/profile', async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -108,4 +116,11 @@ const lazyMarket = new Proxy({} as MarketService, {
 export async function stopMarketWorker() {
   await marketRuntime?.stop();
 }
-export const app = createApp(lazyAuth, authConfig, lazyMarket);
+let watchlistService: WatchlistService | undefined;
+const lazyWatchlists = new Proxy({} as WatchlistService, {
+  get(_target, key: keyof WatchlistService) {
+    watchlistService ??= createWatchlistService(getDatabaseClient());
+    return watchlistService[key];
+  },
+});
+export const app = createApp(lazyAuth, authConfig, lazyMarket, lazyWatchlists);

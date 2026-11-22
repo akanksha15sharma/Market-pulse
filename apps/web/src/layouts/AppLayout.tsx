@@ -30,6 +30,12 @@ export function AppLayout() {
             >
               Markets
             </NavLink>
+            <NavLink
+              to="/watchlists"
+              className="text-slate-300 hover:text-teal-300"
+            >
+              Watchlists
+            </NavLink>
             <Link to="/account" className="text-slate-300 hover:text-teal-300">
               Account
             </Link>

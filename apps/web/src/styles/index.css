@@ -638,3 +638,191 @@
     width: 100%;
   }
 }
+
+/* Phase 6: private watchlists reuse the market panels and price presentation. */
+.watchlists-layout {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  align-items: start;
+  gap: 1.5rem;
+}
+.watchlist-content {
+  min-width: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+.watchlist-sidebar .panel-heading {
+  padding: 1.2rem;
+}
+.watchlist-nav {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+}
+.watchlist-nav > a {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  color: #cbd5e1;
+}
+.watchlist-nav > a > span:first-child {
+  overflow-wrap: anywhere;
+}
+.watchlist-nav > a:hover {
+  background: #142a3b;
+}
+.watchlist-nav > a[aria-current='page'] {
+  background: #173f40;
+  color: #99f6e4;
+}
+.watchlist-nav > p {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.watchlist-create {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+  border-top: 1px solid #26354a;
+}
+.watchlist-create label,
+.watchlist-rename label,
+.watchlist-search-label,
+.watchlists-page .sort-label {
+  color: #cbd5e1;
+  font-size: 0.875rem;
+}
+.watchlist-create input,
+.watchlist-rename input {
+  padding: 0.65rem 0.8rem;
+  font-size: 0.9rem;
+}
+.watchlist-create .primary-button {
+  padding: 0.65rem 1rem;
+}
+.watchlist-title {
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.watchlist-rename {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid #26354a;
+}
+.watchlist-rename label {
+  flex: 1;
+  min-width: 0;
+}
+.watchlist-danger {
+  color: #fda4af;
+}
+.watchlist-confirm {
+  padding: 1.25rem 1.5rem;
+  background: #2c222c;
+  border-bottom: 1px solid #4a3443;
+  line-height: 1.7;
+}
+.watchlist-confirm > p:first-child {
+  overflow-wrap: anywhere;
+}
+.watchlist-confirm .muted {
+  font-size: 0.875rem;
+}
+.watchlist-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.watchlist-search-label {
+  flex: 1;
+  min-width: 10rem;
+}
+.watchlist-search-label input {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.8rem;
+}
+.watchlists-page .sort-label {
+  display: grid;
+  gap: 0.5rem;
+}
+.watchlist-picker {
+  display: grid;
+  padding: 0.25rem 1.5rem 1rem;
+}
+.watchlist-picker li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid #26354a;
+}
+.watchlist-picker strong {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+.watchlist-picker .muted {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+.watchlist-feedback {
+  padding: 0.8rem 1rem;
+  border: 1px solid #264449;
+  border-radius: 0.6rem;
+  background: #0c232b;
+}
+.watchlist-limit {
+  padding: 0.5rem 1.5rem;
+  color: #fbd38d;
+  font-size: 0.875rem;
+}
+.watchlists-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.watchlists-page .market-table th,
+.watchlists-page .market-table td {
+  padding: 1rem;
+}
+@media (max-width: 850px) {
+  .watchlists-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .watchlist-nav {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .watchlist-nav > a {
+    max-width: 100%;
+  }
+  .watchlist-create {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .watchlist-create > p {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 500px) {
+  .watchlist-create {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .watchlist-rename {
+    padding: 1rem;
+    flex-wrap: wrap;
+  }
+  .watchlist-rename label {
+    flex-basis: 100%;
+  }
+  .watchlist-picker {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
