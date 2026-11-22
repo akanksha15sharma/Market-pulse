@@ -21,18 +21,19 @@ export function HistoryChart({
   const state = historyStatus(history);
   const points = state === 'unavailable' ? [] : chartPoints(history);
   const [selected, setSelected] = useState<number | null>(null);
+  const waiting =
+    history.refresh === 'pending' &&
+    (!history.reason || ['pending', 'busy'].includes(history.reason));
   if (!points.length)
     return (
       <div className="chart-empty" role="status">
         <DataLabel simulated={history.simulated} />
         <p>{history.provider} · unavailable</p>
         <strong>
-          {history.refresh === 'pending'
-            ? 'Preparing price history'
-            : 'History unavailable'}
+          {waiting ? 'Preparing price history' : 'History unavailable'}
         </strong>
         <p>
-          {history.refresh === 'pending'
+          {waiting
             ? 'The backend has queued this range. We check again in 20 seconds while this tab is visible.'
             : 'No usable historical observations are cached for this range.'}
         </p>
@@ -192,13 +193,13 @@ export function HistoryChart({
       </p>
       {!history.simulated && (
         <p className="quote-notice">
-          Data provided by{' '}
+          Powered by{' '}
           <a
-            href="https://www.coingecko.com/en/api"
+            href="https://coinpaprika.com/api"
             target="_blank"
             rel="noreferrer"
           >
-            CoinGecko
+            CoinPaprika
           </a>
           .
         </p>

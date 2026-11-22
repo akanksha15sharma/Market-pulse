@@ -110,11 +110,12 @@ user and twenty assets per list. Existing PostgreSQL tables are reused; no new
 migration is required. See [watchlist API, setup and acceptance](docs/watchlists.md)
 and [Phase 6 verification](PHASE6-VERIFICATION.md). Phase 7 has not started.
 
-## Real crypto data
+## Real crypto data — no API key
 
-The dashboard, asset details and watchlists consume the existing server-side
-CoinGecko quotes and historical caches when explicitly configured. Stocks remain
-simulated. See [server-only live setup and quota preflight](docs/live-crypto.md) and
-[live verification results](LIVE-CRYPTO-VERIFICATION.md). Run npm run markets:check
-after configuring apps/api/.env; it makes no upstream calls. Without credentials,
-CoinGecko mode reports unavailable instead of substituting synthetic crypto.
+Live crypto uses CoinPaprika's free public endpoints; stocks remain simulated.
+Set CRYPTO_DATA_MODE=coinpaprika (the default), apply the new additive migrations
+and seed provider mappings. No account, key, subscription or billing window is
+required. Free history uses hourly samples for 1D and daily samples for 7D/1M/1Y;
+missing history stays explicitly unavailable. See [keyless setup](docs/live-crypto.md)
+and [verification](COINPAPRIKA-VERIFICATION.md). The read-only npm run markets:check
+inspects persisted budgets without upstream calls. Phase 7 has not started.

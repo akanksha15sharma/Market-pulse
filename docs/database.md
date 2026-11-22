@@ -74,8 +74,8 @@ edit an applied migration; create a subsequent migration when changing deployed 
 
 The catalog seed performs transactional upserts by stable asset key. Running twice
 keeps asset IDs stable. It adds exactly ten curated crypto assets and five demo-only
-NASDAQ stocks on an otherwise empty database. Crypto has COINGECKO and DEMO mappings;
-stocks have only DEMO mappings (25 mappings total). XRP maps to ripple; Avalanche to
+NASDAQ stocks on an otherwise empty database. Crypto retains legacy COINGECKO and DEMO mappings and now adds COINPAPRIKA;
+stocks have only DEMO mappings (35 mappings total after the provider switch). XRP maps to ripple; Avalanche to
 avalanche-2. No network calls, market prices, users, passwords or personal data are
 seeded. Existing user records/transactions are never deleted. isActive is not reset.
 The seed is explicit in Prisma 7, not automatic during migration deploy.

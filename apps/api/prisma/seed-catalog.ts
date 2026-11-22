@@ -1,5 +1,5 @@
 import type { Prisma } from '../src/generated/prisma/client.js';
-import { cryptoCatalog, stockCatalog } from './catalog.js';
+import { cryptoCatalog, stockCatalog, coinPaprikaIds } from './catalog.js';
 
 export async function seedCatalog(db: Prisma.TransactionClient) {
   for (const [providerAssetId, symbol, name] of cryptoCatalog) {
@@ -18,6 +18,7 @@ export async function seedCatalog(db: Prisma.TransactionClient) {
     });
     for (const [provider, externalId] of [
       ['COINGECKO', providerAssetId],
+      ['COINPAPRIKA', coinPaprikaIds[providerAssetId]],
       ['DEMO', key],
     ] as const) {
       await db.assetProviderMapping.upsert({

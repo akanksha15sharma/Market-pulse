@@ -1,5 +1,5 @@
 import type { HistoryRange, MarketAsset } from '@marketpulse/contracts';
-export type Source = 'DEMO' | 'COINGECKO';
+export type Source = 'DEMO' | 'COINPAPRIKA';
 export type Mode = 'DEMO' | 'REAL';
 export type CatalogAsset = MarketAsset & {
   mappings: { provider: string; externalId: string }[];
@@ -85,6 +85,7 @@ export class MarketDeferred extends Error {
 export class ProviderFailure extends Error {
   constructor(
     public readonly reason:
+      | 'history_unavailable'
       | 'network_error'
       | 'rate_limited'
       | 'unauthorized'
@@ -103,11 +104,15 @@ export const historyTtl = {
   '1M': 6 * 3600_000,
   '1Y': 24 * 3600_000,
 } as const;
-export const granularity = (range: HistoryRange) =>
-  range === '1D'
-    ? ('5m' as const)
-    : range === '1Y'
-      ? ('1d' as const)
-      : ('1h' as const);
+export const granularity = (range: HistoryRange, provider: Source = 'DEMO') =>
+  provider === 'COINPAPRIKA'
+    ? range === '1D'
+      ? ('1h' as const)
+      : ('1d' as const)
+    : range === '1D'
+      ? ('5m' as const)
+      : range === '1Y'
+        ? ('1d' as const)
+        : ('1h' as const);
 export const historyId = (key: HistoryKey) =>
   `${key.assetId}:${key.provider}:${key.mode}:${key.range}`;

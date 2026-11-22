@@ -18,7 +18,7 @@ account routes and backend behavior are preserved. Phase 6 watchlists are exclud
 
 Prices show provider, observation time, freshness and real/simulated identity.
 Stocks retain explicit simulated-stock context; demo crypto is also labeled.
-CoinGecko attribution appears when real crypto mode is configured. Source refresh
+CoinPaprika attribution appears when real crypto mode is configured. Source refresh
 policy comes from `/market-status`; browser polling is a cache read, not a claim
 that the provider refreshed. Worker-disabled status is visible.
 
@@ -77,3 +77,6 @@ npm run build
 ```
 
 See [Phase 5 verification](../PHASE5-VERIFICATION.md) for executed checks and limits.
+
+The live-provider switch and current hourly/daily chart availability are described
+in [CoinPaprika setup](live-crypto.md).

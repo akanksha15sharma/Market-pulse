@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { cryptoCatalog, stockCatalog } from '../../prisma/catalog.js';
+import {
+  cryptoCatalog,
+  stockCatalog,
+  coinPaprikaIds,
+} from '../../prisma/catalog.js';
 import {
   MarketDeferred,
   historyId,
@@ -24,7 +28,7 @@ export function catalog(): CatalogAsset[] {
       quoteCurrency: 'USD' as const,
       isDemoOnly: false,
       mappings: [
-        { provider: 'COINGECKO', externalId },
+        { provider: 'COINPAPRIKA', externalId: coinPaprikaIds[externalId] },
         { provider: 'DEMO', externalId: `crypto:${externalId}` },
       ],
     })),

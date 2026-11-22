@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  createCoinGeckoProvider,
+  createCoinPaprikaProvider,
   retryAfter,
-} from '../../src/providers/coingecko-provider.js';
+} from '../../src/providers/coinpaprika-provider.js';
 import { demoProvider } from '../../src/providers/demo-provider.js';
 import type { MarketProvider } from '../../src/providers/market-provider.js';
 import { marketSettingsSchema } from '../../src/config/markets.js';
@@ -22,16 +22,34 @@ import { request } from '../helpers/http.js';
 import { memoryStore } from '../helpers/market-store.js';
 
 const NOW = Date.parse('2026-11-22T12:00:00Z');
-const demo = marketSettingsSchema.parse({});
+const demo = marketSettingsSchema.parse({ CRYPTO_DATA_MODE: 'demo' });
 function real(overrides = {}) {
   return marketSettingsSchema.parse({
-    CRYPTO_DATA_MODE: 'coingecko',
-    COINGECKO_LIVE_ENABLED: 'true',
-    COINGECKO_API_KEY: 'synthetic-secret',
-    CG_BILLING_START: '2026-11-01T00:00:00Z',
-    CG_BILLING_END: '2026-12-01T00:00:00Z',
+    CRYPTO_DATA_MODE: 'coinpaprika',
     ...overrides,
   });
+}
+function ticker(
+  id: string,
+  price: number | null = 123.45,
+  percent: number | null = 1.5,
+  time = NOW - 60_000,
+) {
+  return {
+    id,
+    last_updated: new Date(time).toISOString(),
+    quotes: { USD: { price, percent_change_24h: percent } },
+  };
+}
+function liveTickers(fixture: ReturnType<typeof memoryStore>) {
+  return fixture.assets
+    .slice(0, 10)
+    .map((asset) =>
+      ticker(
+        asset.mappings.find((mapping) => mapping.provider === 'COINPAPRIKA')!
+          .externalId,
+      ),
+    );
 }
 function clock() {
   const time = { value: NOW };
@@ -70,38 +88,30 @@ test('synthetic quotes/history are deterministic, decimal strings, bounded and n
   }
 });
 
-test('CoinGecko batches at a fixed origin, preserves source time, and rejects unknown or invalid observations', async () => {
-  const { assets } = memoryStore();
-  const asset = assets[0]!;
+test('CoinPaprika uses one keyless free-host batch, preserves source time and ignores unusable or unrelated rows', async () => {
+  const asset = memoryStore().assets[0]!;
   let calls = 0;
-  const provider = createCoinGeckoProvider(
-    'synthetic-secret',
-    async (url, options) => {
-      calls++;
-      assert.equal(new URL(String(url)).origin, 'https://api.coingecko.com');
-      assert.equal(options?.redirect, 'error');
-      assert.equal(
-        (options?.headers as Record<string, string>)['x-cg-demo-api-key'],
-        'synthetic-secret',
-      );
-      assert.ok(options?.signal);
-      return Response.json([
-        {
-          id: 'bitcoin',
-          current_price: 123.5,
-          price_change_percentage_24h: null,
-          last_updated: new Date(NOW - 60_000).toISOString(),
-        },
-        { id: 'not-requested', current_price: 3, last_updated: null },
-      ]);
-    },
-  );
+  const provider = createCoinPaprikaProvider(async (input, options) => {
+    calls++;
+    const url = new URL(String(input));
+    assert.equal(url.origin, 'https://api.coinpaprika.com');
+    assert.equal(url.pathname, '/v1/tickers');
+    assert.equal(url.search, '?quotes=USD');
+    assert.equal(options?.headers, undefined);
+    assert.equal(options?.redirect, 'error');
+    assert.ok(options?.signal);
+    return Response.json([
+      ticker('btc-bitcoin', 123.5, null),
+      { id: 'unrelated', quotes: {} },
+    ]);
+  });
   const result = await provider.quotes([asset], NOW);
   assert.equal(calls, 1);
   assert.equal(result[0]?.price, '123.500000000000000000');
   assert.equal(result[0]?.sourceAt, NOW - 60_000);
-  const invalid = createCoinGeckoProvider('key', async () =>
-    Response.json([{ id: 'bitcoin', current_price: 1, last_updated: null }]),
+  assert.equal(result[0]?.changePercent, null);
+  const invalid = createCoinPaprikaProvider(async () =>
+    Response.json([{ ...ticker('btc-bitcoin'), last_updated: null }]),
   );
   await assert.rejects(
     () => invalid.quotes([asset], NOW),
@@ -110,41 +120,46 @@ test('CoinGecko batches at a fixed origin, preserves source time, and rejects un
   );
 });
 
-test('provider history normalizes duplicate timestamps; errors/Retry-After never expose keys or response bodies', async () => {
+test('free history uses hourly one-day and daily longer ranges, sorts/deduplicates and handles safe errors', async () => {
   const asset = memoryStore().assets[0]!;
-  const history = createCoinGeckoProvider('key', async () =>
-    Response.json({
-      prices: [
-        [NOW, 2],
-        [NOW - 300_000, 1],
-        [NOW, 3],
-      ],
-    }),
-  );
-  assert.deepEqual(
-    (await history.history(asset, '1D', NOW)).map((row) => row.price),
-    ['1.000000000000000000', '3.000000000000000000'],
-  );
+  const provider = createCoinPaprikaProvider(async (input, options) => {
+    const url = new URL(String(input));
+    assert.equal(options?.headers, undefined);
+    assert.equal(url.origin, 'https://api.coinpaprika.com');
+    assert.equal(url.pathname, '/v1/tickers/btc-bitcoin/historical');
+    assert.ok(['1h', '24h'].includes(url.searchParams.get('interval')!));
+    assert.equal(url.searchParams.get('quote'), 'usd');
+    return Response.json([
+      { timestamp: new Date(NOW).toISOString(), price: 2 },
+      { timestamp: new Date(NOW - 3600_000).toISOString(), price: 1 },
+      { timestamp: new Date(NOW).toISOString(), price: 3 },
+    ]);
+  });
+  for (const range of ['1D', '7D', '1M', '1Y'] as const)
+    assert.deepEqual(
+      (await provider.history(asset, range, NOW)).map((row) => row.price),
+      ['1.000000000000000000', '3.000000000000000000'],
+    );
   for (const [status, reason] of [
     [401, 'unauthorized'],
     [403, 'unauthorized'],
+    [402, 'rate_limited'],
     [429, 'rate_limited'],
     [503, 'upstream_error'],
   ] as const) {
-    const provider = createCoinGeckoProvider(
-      'SECRET',
+    const failed = createCoinPaprikaProvider(
       async () =>
-        new Response('SECRET upstream details', {
+        new Response('PRIVATE upstream details', {
           status,
           headers: { 'Retry-After': '120' },
         }),
     );
     await assert.rejects(
-      () => provider.quotes([asset], NOW),
+      () => failed.quotes([asset], NOW),
       (error: unknown) =>
         error instanceof ProviderFailure &&
         error.reason === reason &&
-        !error.message.includes('SECRET'),
+        !error.message.includes('PRIVATE'),
     );
   }
   assert.equal(retryAfter('120', NOW), NOW + 120_000);
@@ -209,7 +224,7 @@ test('timeouts retry within quota and stale real observations never switch to de
   await fixture.store.saveQuotes([
     {
       assetId: asset.id,
-      provider: 'COINGECKO',
+      provider: 'COINPAPRIKA',
       mode: 'REAL',
       price: '123',
       changePercent: null,
@@ -226,7 +241,7 @@ test('timeouts retry within quota and stale real observations never switch to de
       fetchedAt: NOW,
     },
   ]);
-  const provider = createCoinGeckoProvider('key', async () => {
+  const provider = createCoinPaprikaProvider(async () => {
     calls++;
     throw new Error('network down');
   });
@@ -248,10 +263,10 @@ test('timeouts retry within quota and stale real observations never switch to de
   assert.equal(quote.status, 'stale');
   assert.equal(quote.price, '123');
   assert.equal(quote.simulated, false);
-  assert.equal(quote.provider, 'COINGECKO');
+  assert.equal(quote.provider, 'COINPAPRIKA');
   const windows = budgetWindows(real(), timer.now(), 'quotes');
   assert.equal(
-    (await fixture.store.usage('COINGECKO', windows)).find(
+    (await fixture.store.usage('COINPAPRIKA', windows)).find(
       (row) => row.category === 'all:month',
     )?.used,
     3,
@@ -263,7 +278,7 @@ test('429 pauses without a retry storm and unauthorized providers remain disable
     const fixture = memoryStore();
     const timer = clock();
     let calls = 0;
-    const provider = createCoinGeckoProvider('key', async () => {
+    const provider = createCoinPaprikaProvider(async () => {
       calls++;
       return new Response('', {
         status: code,
@@ -285,19 +300,19 @@ test('429 pauses without a retry storm and unauthorized providers remain disable
       timer,
     ).tick();
     assert.equal(calls, 1);
-    assert.equal(fixture.states.get('COINGECKO')?.disabled, code === 401);
+    assert.equal(fixture.states.get('COINPAPRIKA')?.disabled, code === 401);
   }
 });
 
-test('exhausted windows roll back reservations; missing/expired billing configuration prevents real fetches', async () => {
+test('exhausted windows stop requests atomically and monthly windows follow UTC without account configuration', async () => {
   const fixture = memoryStore();
   const timer = clock();
   let calls = 0;
-  const settings = real({ CG_MONTHLY_ATTEMPT_LIMIT: '1' });
+  const settings = real({ CP_MONTHLY_ATTEMPT_LIMIT: '1' });
   const windows = budgetWindows(settings, NOW, 'quotes');
-  await fixture.store.reserve('COINGECKO', windows);
-  await fixture.store.settle('COINGECKO', windows);
-  const provider = createCoinGeckoProvider('key', async () => {
+  await fixture.store.reserve('COINPAPRIKA', windows);
+  await fixture.store.settle('COINPAPRIKA', windows);
+  const provider = createCoinPaprikaProvider(async () => {
     calls++;
     return Response.json([]);
   });
@@ -309,15 +324,18 @@ test('exhausted windows roll back reservations; missing/expired billing configur
   ).tick();
   assert.equal(calls, 0);
   assert.ok(
-    (await fixture.store.usage('COINGECKO', windows)).every(
+    (await fixture.store.usage('COINPAPRIKA', windows)).every(
       (row) => row.used === 1,
     ),
   );
-  assert.throws(() => budgetWindows(demo, NOW, 'quotes'), /not_configured/);
-  assert.throws(
-    () => budgetWindows(settings, Date.parse('2026-12-02T00:00:00Z'), 'quotes'),
-    /billing_window_inactive/,
-  );
+  assert.throws(() => budgetWindows(demo, NOW, 'quotes'), /demo_mode/);
+  const next = budgetWindows(
+    settings,
+    Date.parse('2026-12-02T00:00:00Z'),
+    'quotes',
+  ).find((window) => window.category === 'all:month')!;
+  assert.equal(next.start, Date.parse('2026-12-01T00:00:00Z'));
+  assert.equal(next.end, Date.parse('2027-01-01T00:00:00Z'));
 });
 
 test('history misses coalesce, retain stale data, expire after 48 hours and queue a refresh', async () => {
@@ -362,7 +380,7 @@ test('circuit breaker allows just one recovery probe after repeated transient fa
   const fixture = memoryStore();
   const timer = clock();
   let calls = 0;
-  const provider = createCoinGeckoProvider('key', async () => {
+  const provider = createCoinPaprikaProvider(async () => {
     calls++;
     return new Response('', { status: 503 });
   });
@@ -488,40 +506,20 @@ test('real ingestion serves crypto quotes and charts without touching stock demo
     1800_000,
   );
   let calls = 0;
-  const provider = createCoinGeckoProvider(
-    'synthetic-secret',
-    async (input, options) => {
-      calls++;
-      const url = new URL(String(input));
-      assert.equal(url.origin, 'https://api.coingecko.com');
-      assert.ok(!url.toString().includes('synthetic-secret'));
-      assert.equal(
-        (options?.headers as Record<string, string>)['x-cg-demo-api-key'],
-        'synthetic-secret',
-      );
-      if (url.pathname.endsWith('/coins/markets')) {
-        const ids = url.searchParams.get('ids')!.split(',');
-        assert.equal(ids.length, 10);
-        return Response.json(
-          ids.map((id) => ({
-            id,
-            current_price: 123.45,
-            price_change_percentage_24h: 1.5,
-            last_updated: new Date(NOW - 60_000).toISOString(),
-          })),
-        );
-      }
-      assert.ok(url.pathname.endsWith('/bitcoin/market_chart'));
-      assert.equal(url.searchParams.get('days'), '1');
-      assert.equal(url.searchParams.has('interval'), false);
-      return Response.json({
-        prices: [
-          [NOW - 300_000, 122],
-          [NOW, 123.45],
-        ],
-      });
-    },
-  );
+  const provider = createCoinPaprikaProvider(async (input, options) => {
+    calls++;
+    const url = new URL(String(input));
+    assert.equal(url.origin, 'https://api.coinpaprika.com');
+    assert.equal(options?.headers, undefined);
+    if (url.pathname === '/v1/tickers')
+      return Response.json(liveTickers(fixture));
+    assert.equal(url.pathname, '/v1/tickers/btc-bitcoin/historical');
+    assert.equal(url.searchParams.get('interval'), '1h');
+    return Response.json([
+      { timestamp: new Date(NOW - 3600_000).toISOString(), price: 122 },
+      { timestamp: new Date(NOW).toISOString(), price: 123.45 },
+    ]);
+  });
   const service = createMarketService(
     fixture.store,
     real(),
@@ -534,7 +532,7 @@ test('real ingestion serves crypto quotes and charts without touching stock demo
       .slice(0, 10)
       .every(
         (quote) =>
-          quote.provider === 'COINGECKO' &&
+          quote.provider === 'COINPAPRIKA' &&
           !quote.simulated &&
           quote.price === null,
       ),
@@ -571,7 +569,7 @@ test('real ingestion serves crypto quotes and charts without touching stock demo
   );
   const chart = await service.history(asset.id, '1D');
   assert.equal(chart.status, 200);
-  assert.equal(chart.body.provider, 'COINGECKO');
+  assert.equal(chart.body.provider, 'COINPAPRIKA');
   assert.equal(chart.body.simulated, false);
   assert.equal(chart.body.sourceAt, new Date(NOW).toISOString());
   assert.equal(chart.body.points.at(-1)?.price, '123.450000000000000000');
@@ -582,22 +580,22 @@ test('real ingestion serves crypto quotes and charts without touching stock demo
   assert.equal(calls, 2);
   const status = await service.status();
   assert.equal(
-    status.providers.find((row) => row.provider === 'COINGECKO')?.quoteReason,
+    status.providers.find((row) => row.provider === 'COINPAPRIKA')?.quoteReason,
     null,
   );
   assert.ok(!JSON.stringify(status).includes('synthetic-secret'));
 });
 
-test('unconfigured live crypto makes no upstream requests and stays unavailable while stocks are simulated', async () => {
+test('default live crypto works without keys, subscriptions, enable flags or billing windows', async () => {
   const fixture = memoryStore();
   const timer = clock();
   let calls = 0;
-  const settings = marketSettingsSchema.parse({
-    CRYPTO_DATA_MODE: 'coingecko',
-  });
-  const provider = createCoinGeckoProvider('', async () => {
+  const settings = marketSettingsSchema.parse({});
+  assert.equal(settings.CRYPTO_DATA_MODE, 'coinpaprika');
+  const provider = createCoinPaprikaProvider(async (_input, options) => {
     calls++;
-    return Response.json([]);
+    assert.equal(options?.headers, undefined);
+    return Response.json(liveTickers(fixture));
   });
   await createMarketEngine(
     fixture.store,
@@ -605,7 +603,7 @@ test('unconfigured live crypto makes no upstream requests and stays unavailable 
     settings,
     timer,
   ).tick();
-  assert.equal(calls, 0);
+  assert.equal(calls, 1);
   const service = createMarketService(
     fixture.store,
     settings,
@@ -618,10 +616,9 @@ test('unconfigured live crypto makes no upstream requests and stays unavailable 
       .slice(0, 10)
       .every(
         (quote) =>
-          quote.status === 'unavailable' &&
-          quote.provider === 'COINGECKO' &&
-          !quote.simulated &&
-          quote.reason === 'not_configured',
+          quote.status === 'fresh' &&
+          quote.provider === 'COINPAPRIKA' &&
+          !quote.simulated,
       ),
   );
   assert.ok(
@@ -629,22 +626,23 @@ test('unconfigured live crypto makes no upstream requests and stays unavailable 
       .slice(10)
       .every((quote) => quote.status === 'fresh' && quote.simulated),
   );
-  const providerStatus = (await service.status()).providers.find(
-    (row) => row.provider === 'COINGECKO',
-  )!;
-  assert.equal(providerStatus.quoteReason, 'not_configured');
-  assert.equal(providerStatus.historyReason, 'not_configured');
+  assert.equal(
+    (await service.status()).providers.find(
+      (row) => row.provider === 'COINPAPRIKA',
+    )?.quoteReason,
+    null,
+  );
 });
 
 test('chart-only quota exhaustion does not label quote updates blocked; global exhaustion blocks both', async () => {
   const fixture = memoryStore();
   const settings = real({
-    CG_CHART_DAILY_LIMIT: '1',
-    CG_MONTHLY_ATTEMPT_LIMIT: '2',
+    CP_CHART_DAILY_LIMIT: '1',
+    CP_MONTHLY_ATTEMPT_LIMIT: '2',
   });
   const charts = budgetWindows(settings, NOW, 'history');
-  await fixture.store.reserve('COINGECKO', charts);
-  await fixture.store.settle('COINGECKO', charts);
+  await fixture.store.reserve('COINPAPRIKA', charts);
+  await fixture.store.settle('COINPAPRIKA', charts);
   const service = createMarketService(
     fixture.store,
     settings,
@@ -652,15 +650,15 @@ test('chart-only quota exhaustion does not label quote updates blocked; global e
     () => NOW,
   );
   let status = (await service.status()).providers.find(
-    (row) => row.provider === 'COINGECKO',
+    (row) => row.provider === 'COINPAPRIKA',
   )!;
   assert.equal(status.quoteReason, null);
   assert.equal(status.historyReason, 'quota_exhausted');
   const quotes = budgetWindows(settings, NOW, 'quotes');
-  await fixture.store.reserve('COINGECKO', quotes);
-  await fixture.store.settle('COINGECKO', quotes);
+  await fixture.store.reserve('COINPAPRIKA', quotes);
+  await fixture.store.settle('COINPAPRIKA', quotes);
   status = (await service.status()).providers.find(
-    (row) => row.provider === 'COINGECKO',
+    (row) => row.provider === 'COINPAPRIKA',
   )!;
   assert.equal(status.quoteReason, 'quota_exhausted');
   assert.equal(status.historyReason, 'quota_exhausted');
@@ -674,9 +672,9 @@ test('freshly fetched history with old source observations is stale for every su
   const fixture = memoryStore();
   const asset = fixture.assets[0]!;
   const sourceAges = {
-    '1D': 30 * 60_000,
-    '7D': 6 * 3600_000,
-    '1M': 6 * 3600_000,
+    '1D': 2 * 3600_000,
+    '7D': 48 * 3600_000,
+    '1M': 48 * 3600_000,
     '1Y': 48 * 3600_000,
   } as const;
   const service = createMarketService(
@@ -688,7 +686,7 @@ test('freshly fetched history with old source observations is stale for every su
   for (const range of ['1D', '7D', '1M', '1Y'] as const) {
     const key = {
       assetId: asset.id,
-      provider: 'COINGECKO' as const,
+      provider: 'COINPAPRIKA' as const,
       mode: 'REAL' as const,
       range,
     };
@@ -725,7 +723,7 @@ test('live history failure retains stale real points and never substitutes an ex
   const asset = fixture.assets[0]!;
   const key = {
     assetId: asset.id,
-    provider: 'COINGECKO' as const,
+    provider: 'COINPAPRIKA' as const,
     mode: 'REAL' as const,
     range: '1D' as const,
   };
@@ -748,8 +746,7 @@ test('live history failure retains stale real points and never substitutes an ex
     timer.now,
   );
   await service.history(asset.id, '1D');
-  const provider = createCoinGeckoProvider(
-    'synthetic-secret',
+  const provider = createCoinPaprikaProvider(
     async () => new Response('synthetic-secret upstream body', { status: 401 }),
   );
   await createMarketEngine(
@@ -760,23 +757,23 @@ test('live history failure retains stale real points and never substitutes an ex
   ).tick();
   const result = await service.history(asset.id, '1D');
   assert.equal(result.body.status, 'stale');
-  assert.equal(result.body.provider, 'COINGECKO');
+  assert.equal(result.body.provider, 'COINPAPRIKA');
   assert.equal(result.body.reason, 'unauthorized');
   assert.deepEqual(
     result.body.points.map((point) => point.price),
     ['123'],
   );
   const status = (await service.status()).providers.find(
-    (row) => row.provider === 'COINGECKO',
+    (row) => row.provider === 'COINPAPRIKA',
   )!;
   assert.equal(status.quoteReason, 'unauthorized');
   assert.equal(status.historyReason, 'unauthorized');
   assert.ok(!JSON.stringify(status).includes('synthetic-secret'));
 });
 
-test('CoinGecko cannot ingest stocks or bypass approved application limits', async () => {
+test('CoinPaprika cannot ingest stocks or bypass approved application limits', async () => {
   let calls = 0;
-  const provider = createCoinGeckoProvider('synthetic-secret', async () => {
+  const provider = createCoinPaprikaProvider(async () => {
     calls++;
     return Response.json([]);
   });
@@ -787,11 +784,133 @@ test('CoinGecko cannot ingest stocks or bypass approved application limits', asy
   );
   assert.equal(calls, 0);
   for (const config of [
-    { CG_MONTHLY_ATTEMPT_LIMIT: 8001 },
-    { CG_DAILY_ATTEMPT_LIMIT: 261 },
-    { CG_MINUTE_ATTEMPT_LIMIT: 11 },
-    { CG_CHART_DAILY_LIMIT: 81 },
-    { STOCK_DATA_MODE: 'coingecko' },
+    { CP_MONTHLY_ATTEMPT_LIMIT: 8001 },
+    { CP_DAILY_ATTEMPT_LIMIT: 261 },
+    { CP_MINUTE_ATTEMPT_LIMIT: 11 },
+    { CP_CHART_DAILY_LIMIT: 81 },
+    { STOCK_DATA_MODE: 'coinpaprika' },
   ])
     assert.equal(marketSettingsSchema.safeParse(config).success, false);
+});
+
+test('free-history restrictions and empty data back off durably without disabling quote ingestion', async () => {
+  for (const status of [402, 403, 404, 200]) {
+    const fixture = memoryStore();
+    const timer = clock();
+    const asset = fixture.assets[0]!;
+    const service = createMarketService(
+      fixture.store,
+      real(),
+      () => {},
+      timer.now,
+    );
+    await fixture.store.saveHistory(
+      { assetId: asset.id, provider: 'DEMO', mode: 'DEMO', range: '1M' },
+      [{ timestamp: NOW, price: '999' }],
+      NOW,
+      1800_000,
+    );
+    await service.history(asset.id, '1M');
+    let historyCalls = 0;
+    let quoteCalls = 0;
+    const provider = createCoinPaprikaProvider(async (input, options) => {
+      const url = new URL(String(input));
+      assert.equal(url.origin, 'https://api.coinpaprika.com');
+      assert.equal(options?.headers, undefined);
+      if (url.pathname === '/v1/tickers') {
+        quoteCalls++;
+        return Response.json(liveTickers(fixture));
+      }
+      historyCalls++;
+      assert.equal(url.searchParams.get('interval'), '24h');
+      return status === 200
+        ? Response.json([])
+        : new Response('upgrade or private upstream text', { status });
+    });
+    const engine = createMarketEngine(
+      fixture.store,
+      providers(provider),
+      real(),
+      timer,
+    );
+    await engine.tick();
+    let result = await service.history(asset.id, '1M');
+    assert.equal(result.status, 202);
+    assert.equal(result.body.reason, 'history_unavailable');
+    assert.deepEqual(result.body.points, []);
+    assert.equal(result.body.provider, 'COINPAPRIKA');
+    assert.equal(result.body.granularity, '1d');
+    assert.equal(result.body.simulated, false);
+    assert.equal((await fixture.store.state('COINPAPRIKA')).disabled, false);
+    assert.equal(
+      (await service.status()).providers.find(
+        (row) => row.provider === 'COINPAPRIKA',
+      )?.quoteReason,
+      null,
+    );
+    timer.time.value += 601_000;
+    await engine.tick();
+    assert.equal(historyCalls, 1);
+    assert.equal(quoteCalls, 2);
+    result = await service.history(asset.id, '1M');
+    assert.equal(result.body.reason, 'history_unavailable');
+  }
+});
+
+test('free history sends only entitled resolutions and validates real timestamps', async () => {
+  const intervals: string[] = [];
+  const asset = memoryStore().assets[0]!;
+  const provider = createCoinPaprikaProvider(async (input) => {
+    const url = new URL(String(input));
+    intervals.push(url.searchParams.get('interval')!);
+    assert.ok(
+      Number(url.searchParams.get('start')) >=
+        Math.floor((NOW - 365 * 86400_000) / 1000),
+    );
+    return Response.json([
+      { timestamp: new Date(NOW).toISOString(), price: 12 },
+    ]);
+  });
+  for (const range of ['1D', '7D', '1M', '1Y'] as const)
+    await provider.history(asset, range, NOW);
+  assert.deepEqual(intervals, ['1h', '24h', '24h', '24h']);
+  for (const timestamp of ['invalid', new Date(NOW + 61_000).toISOString()]) {
+    const invalid = createCoinPaprikaProvider(async () =>
+      Response.json([{ timestamp, price: 12 }]),
+    );
+    await assert.rejects(
+      () => invalid.history(asset, '1D', NOW),
+      (error: unknown) =>
+        error instanceof ProviderFailure && error.reason === 'invalid_data',
+    );
+  }
+});
+
+test('partial free ticker batches preserve missing observations and reject invalid provider mapping paths', async () => {
+  const fixture = memoryStore();
+  const provider = createCoinPaprikaProvider(async () =>
+    Response.json([ticker('btc-bitcoin', 123), ticker('eth-ethereum', null)]),
+  );
+  const rows = await provider.quotes(fixture.assets.slice(0, 2), NOW);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.assetId, fixture.assets[0]!.id);
+  let calls = 0;
+  const guarded = createCoinPaprikaProvider(async () => {
+    calls++;
+    return Response.json([]);
+  });
+  await assert.rejects(
+    () =>
+      guarded.quotes(
+        [
+          {
+            ...fixture.assets[0]!,
+            mappings: [{ provider: 'COINPAPRIKA', externalId: '../key/info' }],
+          },
+        ],
+        NOW,
+      ),
+    ProviderFailure,
+  );
+  assert.equal(calls, 0);
 });

@@ -103,7 +103,7 @@ test('missing prices and changes are never presented as zero; source time determ
   assert.equal(quoteStatus(quote, now + 121_000), 'stale');
   assert.equal(
     quoteStatus(
-      { ...quote, provider: 'COINGECKO', mode: 'REAL', simulated: false },
+      { ...quote, provider: 'COINPAPRIKA', mode: 'REAL', simulated: false },
       now + 121_000,
     ),
     'fresh',
@@ -131,13 +131,13 @@ test('price cards and policy persistently identify synthetic stocks and actual p
   assert.match(html, new RegExp(`/assets/${id}`));
   const policy = renderToStaticMarkup(
     <MarketPolicy
-      cryptoMode="coingecko"
+      cryptoMode="coinpaprika"
       cryptoSeconds={600}
       workerEnabled={false}
     />,
   );
   assert.match(policy, /simulated stock data/);
-  assert.match(policy, /coingecko.com/);
+  assert.match(policy, /coinpaprika.com/);
   assert.match(policy, /worker is disabled/);
   assert.match(policy, /10 min/);
 });

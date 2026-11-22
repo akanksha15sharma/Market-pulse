@@ -1,7 +1,7 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { marketSettings, type MarketSettings } from '../../config/markets.js';
 import { demoProvider } from '../../providers/demo-provider.js';
-import { createCoinGeckoProvider } from '../../providers/coingecko-provider.js';
+import { createCoinPaprikaProvider } from '../../providers/coinpaprika-provider.js';
 import type { MarketProvider } from '../../providers/market-provider.js';
 import { createMarketRepository } from './repository.js';
 import { createMarketEngine } from './engine.js';
@@ -14,11 +14,8 @@ export function createMarketRuntime(
 ) {
   const store = createMarketRepository(db);
   const providers = new Map<Source, MarketProvider>([['DEMO', demoProvider]]);
-  if (settings.CRYPTO_DATA_MODE === 'coingecko')
-    providers.set(
-      'COINGECKO',
-      createCoinGeckoProvider(settings.COINGECKO_API_KEY ?? ''),
-    );
+  if (settings.CRYPTO_DATA_MODE === 'coinpaprika')
+    providers.set('COINPAPRIKA', createCoinPaprikaProvider());
   const engine = createMarketEngine(store, providers, settings);
   let activeUntil = 0;
   let timer: NodeJS.Timeout | undefined;

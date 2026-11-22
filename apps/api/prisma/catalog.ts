@@ -19,3 +19,18 @@ export const stockCatalog = [
   ['GOOGL', 'Alphabet'],
   ['NVDA', 'NVIDIA'],
 ] as const;
+
+// Preserve canonical keys/UUIDs; these IDs belong exclusively to CoinPaprika.
+export const coinPaprikaIds: Record<(typeof cryptoCatalog)[number][0], string> =
+  {
+    bitcoin: 'btc-bitcoin',
+    ethereum: 'eth-ethereum',
+    solana: 'sol-solana',
+    ripple: 'xrp-xrp',
+    cardano: 'ada-cardano',
+    dogecoin: 'doge-dogecoin',
+    'avalanche-2': 'avax-avalanche',
+    chainlink: 'link-chainlink',
+    litecoin: 'ltc-litecoin',
+    polkadot: 'dot-polkadot',
+  };

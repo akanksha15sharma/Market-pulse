@@ -7,9 +7,9 @@ import { MarketDeferred } from '../modules/markets/types.js';
 
 // Read-only preflight: no provider request, worker activation, reservation or reset.
 async function check() {
-  if (marketSettings.CRYPTO_DATA_MODE !== 'coingecko') {
+  if (marketSettings.CRYPTO_DATA_MODE !== 'coinpaprika') {
     console.error(
-      'Crypto is in demo mode. See docs/live-crypto.md to select CoinGecko.',
+      'Crypto is in demo mode. See docs/live-crypto.md to select CoinPaprika.',
     );
     process.exitCode = 1;
     return;
@@ -18,7 +18,7 @@ async function check() {
     budgetWindows(marketSettings, Date.now(), 'quotes');
   } catch (error) {
     console.error(
-      `CoinGecko is not ready: ${error instanceof MarketDeferred ? error.reason : 'invalid_configuration'}. See docs/live-crypto.md.`,
+      `CoinPaprika is not ready: ${error instanceof MarketDeferred ? error.reason : 'invalid_configuration'}. See docs/live-crypto.md.`,
     );
     process.exitCode = 1;
     return;
@@ -39,7 +39,7 @@ async function check() {
     // This public DTO contains operational status, never credentials or URLs.
     console.log(JSON.stringify(status, null, 2));
     const provider = status.providers.find(
-      (row) => row.provider === 'COINGECKO',
+      (row) => row.provider === 'COINPAPRIKA',
     );
     if (provider?.quoteReason || provider?.historyReason) process.exitCode = 1;
     else

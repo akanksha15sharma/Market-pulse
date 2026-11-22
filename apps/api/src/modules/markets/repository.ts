@@ -50,7 +50,7 @@ export function createMarketRepository(db: PrismaClient): MarketStore {
     },
     async quotes() {
       const rows = await db.latestQuote.findMany({
-        where: { provider: { in: ['DEMO', 'COINGECKO'] }, currency: 'USD' },
+        where: { provider: { in: ['DEMO', 'COINPAPRIKA'] }, currency: 'USD' },
       });
       return rows.map((row) => ({
         assetId: row.assetId,
@@ -103,7 +103,7 @@ export function createMarketRepository(db: PrismaClient): MarketStore {
         where: {
           pending: true,
           nextAttemptAt: { lte: new Date(now) },
-          provider: { in: ['DEMO', 'COINGECKO'] },
+          provider: { in: ['DEMO', 'COINPAPRIKA'] },
         },
         orderBy: { nextAttemptAt: 'asc' },
         take: limit,
@@ -121,7 +121,7 @@ export function createMarketRepository(db: PrismaClient): MarketStore {
         await tx.historicalBar.createMany({
           data: points.map((point) => ({
             ...filter(key),
-            interval: granularity(key.range),
+            interval: granularity(key.range, key.provider),
             timestamp: new Date(point.timestamp),
             close: point.price,
             expiresAt: new Date(now + 48 * 3600_000),

@@ -76,7 +76,9 @@ function validateSelection(
   for (const quote of quotes) {
     const asset = assets.find((value) => value.id === quote.assetId);
     const expected =
-      asset?.type === 'CRYPTO' && mode === 'coingecko' ? 'COINGECKO' : 'DEMO';
+      asset?.type === 'CRYPTO' && mode === 'coinpaprika'
+        ? 'COINPAPRIKA'
+        : 'DEMO';
     if (!asset || quote.provider !== expected)
       throw new MarketRequestError(
         'Market data mode changed. Reload to fetch matching observations.',
@@ -113,7 +115,7 @@ export async function loadHistory(
   id: string,
   range: HistoryRange,
   signal: AbortSignal,
-  expectedProvider?: 'DEMO' | 'COINGECKO',
+  expectedProvider?: 'DEMO' | 'COINPAPRIKA',
 ) {
   const previous = historyQueue;
   let release!: () => void;
@@ -153,4 +155,7 @@ export async function loadHistory(
   }
 }
 export const historyInterval = (data: History | null) =>
-  data?.refresh === 'pending' ? 20_000 : 60_000;
+  data?.refresh === 'pending' &&
+  (!data.reason || ['pending', 'busy'].includes(data.reason))
+    ? 20_000
+    : 60_000;

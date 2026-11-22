@@ -132,8 +132,8 @@ function AssetDetail({ id }: { id: string }) {
               key={`${range}:${asset.data.status.cryptoMode}`}
               expectedProvider={
                 asset.data.asset.type === 'CRYPTO' &&
-                asset.data.status.cryptoMode === 'coingecko'
-                  ? 'COINGECKO'
+                asset.data.status.cryptoMode === 'coinpaprika'
+                  ? 'COINPAPRIKA'
                   : 'DEMO'
               }
               id={id}
@@ -158,7 +158,7 @@ function AssetHistory({
   name,
   expectedProvider,
 }: {
-  expectedProvider: 'DEMO' | 'COINGECKO';
+  expectedProvider: 'DEMO' | 'COINPAPRIKA';
   id: string;
   range: HistoryRange;
   name: string;

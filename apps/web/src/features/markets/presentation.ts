@@ -1,5 +1,5 @@
 import {
-  HISTORY_SOURCE_MAX_AGE_MS,
+  historySourceMaxAge,
   type MarketAsset,
   type QuoteDto,
 } from '@marketpulse/contracts';
@@ -82,15 +82,15 @@ export function chartPoints(history: Pick<History, 'points'>) {
 
 export function marketReason(reason: string | null | undefined) {
   const messages: Record<string, string> = {
-    not_configured: 'Live crypto is not configured on the server.',
-    billing_window_inactive:
-      'Live crypto is paused outside the configured account window.',
+    history_unavailable:
+      'History is not available from the free public API for this asset or range.',
     quota_exhausted:
       'The provider budget is exhausted. Updates resume after its reset.',
-    unauthorized: 'CoinGecko authentication failed. Live updates are disabled.',
-    rate_limited: 'CoinGecko requested a pause before the next update.',
-    network_error: 'CoinGecko could not be reached.',
-    upstream_error: 'CoinGecko is temporarily unavailable.',
+    unauthorized:
+      'The free public provider refused access. Live updates are paused.',
+    rate_limited: 'CoinPaprika requested a pause before the next update.',
+    network_error: 'CoinPaprika could not be reached.',
+    upstream_error: 'CoinPaprika is temporarily unavailable.',
     invalid_data: 'The provider returned no usable observation.',
     not_cached: 'Waiting for the first cached observation.',
     pending: 'History is queued for background refresh.',
@@ -119,7 +119,7 @@ export function historyStatus(history: History, now = Date.now()) {
     (history.freshUntil && Date.parse(history.freshUntil) <= now) ||
     !Number.isFinite(latest) ||
     latest > now + 60_000 ||
-    now - latest > HISTORY_SOURCE_MAX_AGE_MS[history.range]
+    now - latest > historySourceMaxAge(history.range, history.provider)
   )
     return 'stale';
   return 'fresh';

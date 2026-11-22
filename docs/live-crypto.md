@@ -1,134 +1,130 @@
-# CoinGecko live crypto integration — before Phase 7
+# Keyless real crypto with CoinPaprika
 
-The existing Phase 4 CoinGecko adapter and PostgreSQL cache/worker feed the Phase 5
-market dashboard/details and Phase 6 watchlists. This change completes live-data
-status presentation and source freshness checks. Stocks remain simulated. No
-portfolio or other Phase 7 functionality is included.
+CoinPaprika replaces CoinGecko as the active real crypto provider. The dashboard,
+asset details/charts and watchlists use the existing server-side cache/worker. Stocks
+remain explicitly simulated. No API key, account, card, subscription or billing
+window is used. Phase 7 remains excluded.
 
-## Enable with your own server-side configuration
+## Upgrade an existing checkout
 
-The current local server was checked without displaying any credentials: no
-CoinGecko key or billing window was configured. No live account request was made.
-A credential-free checkout intentionally stays in demo mode until explicitly
-configured. Selecting CoinGecko never enables a synthetic fallback for crypto.
-
-Merge these settings into the existing **apps/api/.env**, replacing each existing
-setting rather than overwriting the file. Replace all placeholders with your own
-Demo key and the actual UTC reset window shown by your CoinGecko account:
+Merge into apps/api/.env, replacing the old CRYPTO_DATA_MODE setting:
 
 ```dotenv
-CRYPTO_DATA_MODE=coingecko
+CRYPTO_DATA_MODE=coinpaprika
 STOCK_DATA_MODE=demo
 MARKET_WORKER_ENABLED=true
-COINGECKO_LIVE_ENABLED=true
-COINGECKO_API_KEY=REPLACE_WITH_YOUR_DEMO_KEY
-CG_BILLING_START=REPLACE_WITH_ACTUAL_ACCOUNT_START_ISO_UTC
-CG_BILLING_END=REPLACE_WITH_ACTUAL_ACCOUNT_END_ISO_UTC
+CP_MINUTE_ATTEMPT_LIMIT=10
+CP_DAILY_ATTEMPT_LIMIT=260
+CP_MONTHLY_ATTEMPT_LIMIT=8000
+CP_CHART_DAILY_LIMIT=80
 ```
 
-ISO UTC timestamps have the form YYYY-MM-DDTHH:mm:ss.sssZ. Both bounds must match
-your account; expired/future windows pause real calls. Incomplete enabled-live
-configuration fails validation. To run the API without live credentials, leave
-COINGECKO_LIVE_ENABLED=false. With CRYPTO_DATA_MODE=coingecko, crypto then reports
-unavailable/not_configured while stocks continue in demo mode.
+CoinPaprika is also the default when CRYPTO_DATA_MODE is absent. Explicit
+CRYPTO_DATA_MODE=demo remains available for offline synthetic development. The old
+coingecko mode is rejected instead of silently mapped to demo. Old COINGECKO__/CG__
+settings are unused and can be removed. No replacement credential variables exist.
+Do not overwrite existing database or authentication settings.
 
-Keep keys out of VITE_ variables, frontend code, Git, URLs and chat. The backend
-sends the key only in x-cg-demo-api-key to the fixed CoinGecko Demo HTTPS origin.
-The browser uses only /api/v1 cache endpoints. .env remains ignored. No API key is
-returned by /market-status, error messages, logs from the preflight, or UI data.
-
-With the existing application database configured and migrated:
+Two additive migrations are required: 20261122000400_coinpaprika_provider adds a
+new enum value; 20261122000500_coinpaprika_mappings uses it after that migration has
+committed. Existing assets, UUIDs, watchlists, portfolios and old quote/history rows
+are untouched. Old CoinGecko data is never relabeled or served as CoinPaprika data.
+The updated idempotent seed retains canonical asset keys and legacy mappings.
 
 ```sh
 cd ~/Documents/marketpulse
 nvm use
 npm run db:up
 npm run db:generate
+npm run db:validate
 npm run db:deploy
 npm run db:seed
 npm run markets:check
 npm run dev
 ```
 
-The preflight is read-only: it checks local configuration, worker enabling,
-persisted provider state and remaining application budgets. It makes no upstream
-request, starts no worker, and reserves/resets nothing. A passing preflight is not
-proof the provider accepted the key. A nonzero result explains missing setup or a
-paused/exhausted provider. Do not reset usage counters to clear a failure. For
-correcting an unauthorized provider, follow the existing targeted circuit-state
-repair in [market backend operations](market-backend.md).
+The preflight reads PostgreSQL provider state and budgets only. It makes no upstream
+requests, starts no worker and resets nothing. A passing preflight is local readiness,
+not proof of external API availability. Initial prices can be unavailable until the
+worker completes; quote cooldowns survive restarts. If PostgreSQL is unavailable or
+the new migrations have not been applied, resolve that before live acceptance.
 
-## Free-tier bounds
+## Only free public endpoints
 
-Checked against the official [pricing](https://www.coingecko.com/en/api/pricing),
-[Demo markets endpoint](https://docs.coingecko.com/demo/reference/coins-markets) and
-[Demo history endpoint](https://docs.coingecko.com/demo/reference/coins-id-market-chart).
-The pricing page currently lists 100 calls/minute and 10,000/month for Demo.
-MarketPulse retains its lower approved ceilings: 10 attempts/minute, 260/UTC day,
-8,000/actual account window and 80 chart attempts/day. Limits may be lowered, not
-raised above these application ceilings. Other applications on the same account
-also consume its provider allowance; keep an appropriate allowance for their use.
+The adapter's fixed base is https://api.coinpaprika.com/v1. It permits only:
 
-One shared batch covers the ten crypto assets, at most once per ten-minute quote
-cooldown. Chart ranges are 1D, 7D, 1M and 1Y (365 days), with automatic granularity.
-History misses coalesce. PostgreSQL reservations, leases and cooldowns survive
-restart and apply across workers. Retries consume the existing global/category
-budgets, 429 respects Retry-After, and 401/403 disables provider operations. Stocks
-never go to CoinGecko. Browser refreshes read shared caches; they do not bypass caps.
-Phase 0 provider display/storage permissions remain unchanged.
+- GET /tickers?quotes=USD — one global batch, filtered by explicit provider IDs for
+  the ten curated crypto assets. No per-row quote request loop or discovery polling.
+- GET /tickers/{coin_id}/historical — USD history with start/end, limit=5000 and an
+  explicitly free interval: 1h for 1D, 24h for 7D/1M/1Y. Start never exceeds 365 days.
 
-## What the UI means
+No authentication header or key parameter is sent. The paid api-pro host, simplified
+paid ticker endpoint, five-minute history, key-info endpoints and upgrade flows are
+never used. Redirects are rejected. Unknown/malformed IDs cannot choose a URL.
+Requests have ten-second timeouts and an eight-MiB streamed response cap (the free
+all-ticker response includes up to 2,000 assets). Only needed quote/history fields
+are normalized to decimal strings with trustworthy source timestamps.
 
-- **Real market data / fresh**: CoinGecko provenance with a usable source observation.
-- **Real market data / stale**: a previous real observation remains visible, with
-  stale status and an explanation. Fetch time never establishes source freshness.
-- **Real market data / unavailable**: no usable real observation is available. No
-  demo value or demo history is substituted, including when a demo cache exists.
-- **Simulated data**: the explicit synthetic mode. Stocks are always in this mode;
-  crypto uses it only when the server explicitly selects demo mode.
+The official [free pricing](https://coinpaprika.com/api/pricing) documents 20,000
+calls/month per IP and personal use. [Ticker docs](https://docs.coinpaprika.com/api-reference/tickers/get-tickers-for-all-active-coins)
+and [history docs](https://docs.coinpaprika.com/api-reference/tickers/get-historical-ticks-for-a-specific-coin)
+identify the public endpoints. The [plan comparison](https://coinpaprika.com/api/pricing)
+limits free intraday data to hourly observations in the last 24 hours and daily
+prices to one year. Historical availability still varies by asset and response.
+No commercial redistribution/deployment or paid access is added by this change.
 
-Dashboard, details and watchlists show the shared live-feed state, source/time and
-request budgets. Quote and chart availability are distinct: exhausting the daily
-chart allowance does not label quote updates blocked. CoinGecko attribution links
-to its API page. Public schemas reject contradictory provider/mode/simulated flags,
-and clients reject quote/chart data inconsistent with the selected mode.
+## Limits and failures
 
-Real quote staleness remains twenty minutes from source time. Chart status combines
-cache freshness with the newest source point: application source-age thresholds are
-30 minutes for 1D, six hours for 7D/1M and 48 hours for 1Y (daily samples need UTC-day
-grace). Cache refresh intervals remain 30 minutes, six hours, six hours and 24 hours.
-Old-source responses do not trigger a rapid refetch loop. Cached chart data expires
-after 48 hours, and the UI hides an expired retained chart even if refresh failed.
+Application ceilings remain below the public allowance: 10 attempts/minute,
+260/UTC day, 8,000/UTC calendar month, 80 chart attempts/day. Configuration can lower
+but not raise them. Quotes share a ten-minute cooldown and one global batch. The
+existing quote/retry category caps, atomic PostgreSQL reservations, leases and
+persistent cooldown/circuit state remain in force. All attempts count, including
+failures. Other applications sharing an egress IP also consume its provider quota.
 
-## Local live acceptance
+429 honors Retry-After; a quote-side 402 pauses for at least 24 hours. Transient
+failures get at most two budgeted retries; access denial never suggests a key or
+paid plan. Missing/restricted free history (401/402/403/404 or empty data) records
+history_unavailable for that asset/range and backs off for 24 hours. It neither
+retries rapidly nor disables otherwise-working quote ingestion. Old real history
+is retained only within its expiry; no fake points are fabricated.
 
-After startup, open /markets and a crypto asset, then /watchlists with a saved crypto
-and stock. Confirm real CoinGecko labels on crypto, explicit demo labels on stocks,
-source times and attribution. Request history and wait for queued processing.
+## Accurate presentation
 
-From another Ubuntu terminal:
+Real prices and history carry COINPAPRIKA / REAL / simulated=false. Stocks retain
+DEMO / DEMO / simulated=true. Shared contracts and UI selection checks reject
+contradictory provenance. Each view shows source, source time and fresh/stale/
+unavailable state with Powered by CoinPaprika attribution. Missing real prices
+stay unavailable; old real observations may remain stale, never become demo.
+
+1D charts are hourly; 7D, 1M and 1Y charts are daily. Chart captions report that
+resolution. Source-age thresholds allow two hours for hourly data and 48 hours for
+daily data, while cache refresh TTLs remain 30 minutes/six hours/six hours/24 hours.
+Quote source staleness stays twenty minutes. Source time is distinct from fetch
+time. Expired chart caches are hidden. Unsupported free history explicitly says
+unavailable instead of promising a chart is preparing indefinitely.
+
+## Local acceptance
+
+Apply all existing migrations to the dedicated test database too (adjust default
+credentials/port if customized):
 
 ```sh
-BASE='http://127.0.0.1:3001/api/v1'
-curl -fsS "$BASE/market-status" | python3 -m json.tool
-ASSET_ID=$(
-  curl -fsS "$BASE/assets?type=CRYPTO&limit=1" |
-  python3 -c 'import json,sys; print(json.load(sys.stdin)["assets"][0]["id"])'
-)
-curl -fsS "$BASE/quotes?assetIds=$ASSET_ID" | python3 -m json.tool
-curl -sS -w '\nHTTP %{http_code}\n' "$BASE/assets/$ASSET_ID/history?range=1D"
-sleep 20
-curl -sS -w '\nHTTP %{http_code}\n' "$BASE/assets/$ASSET_ID/history?range=1D"
+DATABASE_URL=postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test DIRECT_DATABASE_URL=postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test npm run db:deploy
+TEST_DATABASE_URL=postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test npm run test:db
+TEST_DATABASE_URL=postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test npm run test:markets:db
 ```
 
-Initial quotes may be unavailable and history 202 until the worker finishes; cached
-history is 200. Persisted ten-minute quote cooldowns also survive restarts, including
-failed attempts, so startup does not promise an immediate new quote. Inspect all
-four chart ranges without rapid repeated requests. Verify that a provider failure
-keeps previous real values stale or returns unavailable, while stocks stay demo.
-Do not consume live quota to force failures; automated fixtures cover outages.
+Tests refuse nonlocal/non-test databases and clean only their own fixtures. No reset
+is required. The integration suites check stable seed UUIDs, new mappings, and
+preservation/exclusion of legacy CoinGecko caches.
 
-Automated verification uses fake providers, never account credits:
+With npm run dev active, open /markets, a crypto detail and /watchlists. Confirm real
+CoinPaprika crypto and simulated stocks, then inspect all chart ranges and their
+hourly/daily labels. Reload to verify watchlist membership survives the migration.
+Pending history can return 202 before a cached 200; unavailable history must remain
+clearly unavailable. Do not force failures by consuming live quota; fixture tests
+cover rate limits, missing history, malformed responses, outages and cache isolation.
 
 ```sh
 npm test
@@ -136,8 +132,7 @@ npm run lint
 npm run format:check
 npm run typecheck
 npm run build
-TEST_DATABASE_URL=postgresql://marketpulse:marketpulse_dev@127.0.0.1:5432/marketpulse_test npm run test:markets:db
 ```
 
-See [live integration verification](../LIVE-CRYPTO-VERIFICATION.md) for executed
-checks and outstanding local acceptance.
+See [CoinPaprika verification](../COINPAPRIKA-VERIFICATION.md) for executed checks and
+remaining database/browser acceptance.

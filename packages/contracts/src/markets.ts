@@ -48,10 +48,16 @@ export const HISTORY_SOURCE_MAX_AGE_MS = {
   '1M': 6 * 3600_000,
   '1Y': 48 * 3600_000,
 } as const;
+export const historySourceMaxAge = (range: HistoryRange, provider: string) =>
+  provider === 'COINPAPRIKA'
+    ? range === '1D'
+      ? 2 * 3600_000
+      : 48 * 3600_000
+    : HISTORY_SOURCE_MAX_AGE_MS[range];
 export const quoteSchema = z
   .object({
     assetId: z.uuid(),
-    provider: z.enum(['DEMO', 'COINGECKO']),
+    provider: z.enum(['DEMO', 'COINPAPRIKA']),
     mode: z.enum(['DEMO', 'REAL']),
     currency: z.literal('USD'),
     simulated: z.boolean(),
@@ -67,7 +73,7 @@ export const historyResponseSchema = z
   .object({
     assetId: z.uuid(),
     range: historyRangeSchema,
-    provider: z.enum(['DEMO', 'COINGECKO']),
+    provider: z.enum(['DEMO', 'COINPAPRIKA']),
     mode: z.enum(['DEMO', 'REAL']),
     currency: z.literal('USD'),
     simulated: z.boolean(),
@@ -85,7 +91,7 @@ export const historyResponseSchema = z
   })
   .refine(provenance, 'Provider, mode and simulated flag must agree');
 export const marketProviderStatusSchema = z.object({
-  provider: z.enum(['DEMO', 'COINGECKO']),
+  provider: z.enum(['DEMO', 'COINPAPRIKA']),
   enabled: z.boolean(),
   disabled: z.boolean(),
   lastError: z.string().nullable(),
@@ -102,7 +108,7 @@ export const marketProviderStatusSchema = z.object({
   ),
 });
 export const marketStatusSchema = z.object({
-  cryptoMode: z.enum(['demo', 'coingecko']),
+  cryptoMode: z.enum(['demo', 'coinpaprika']),
   stockMode: z.literal('demo'),
   refreshSeconds: z.object({
     crypto: z.number().positive(),

@@ -19,22 +19,11 @@ export function budgetWindows(
   category: 'quotes' | 'history',
   retry = false,
 ): BudgetWindow[] {
-  const start = config.CG_BILLING_START
-    ? Date.parse(config.CG_BILLING_START)
-    : NaN;
-  const end = config.CG_BILLING_END ? Date.parse(config.CG_BILLING_END) : NaN;
-  if (
-    !config.COINGECKO_LIVE_ENABLED ||
-    !config.COINGECKO_API_KEY ||
-    !Number.isFinite(start) ||
-    !Number.isFinite(end)
-  )
-    throw new MarketDeferred('not_configured', now + 3600_000);
-  if (now < start || now >= end)
-    throw new MarketDeferred(
-      'billing_window_inactive',
-      now < start ? start : now + 3600_000,
-    );
+  if (config.CRYPTO_DATA_MODE !== 'coinpaprika')
+    throw new MarketDeferred('demo_mode', now + 3600_000);
+  const date = new Date(now);
+  const start = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+  const end = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
   const minute = Math.floor(now / 60_000) * 60_000;
   const day = Math.floor(now / 86400_000) * 86400_000;
   return [
@@ -42,19 +31,19 @@ export function budgetWindows(
       category: 'all:minute',
       start: minute,
       end: minute + 60_000,
-      limit: config.CG_MINUTE_ATTEMPT_LIMIT,
+      limit: config.CP_MINUTE_ATTEMPT_LIMIT,
     },
     {
       category: 'all:day',
       start: day,
       end: day + 86400_000,
-      limit: config.CG_DAILY_ATTEMPT_LIMIT,
+      limit: config.CP_DAILY_ATTEMPT_LIMIT,
     },
     {
       category: 'all:month',
       start,
       end,
-      limit: config.CG_MONTHLY_ATTEMPT_LIMIT,
+      limit: config.CP_MONTHLY_ATTEMPT_LIMIT,
     },
     ...(category === 'history'
       ? [
@@ -62,7 +51,7 @@ export function budgetWindows(
             category: 'charts:day',
             start: day,
             end: day + 86400_000,
-            limit: config.CG_CHART_DAILY_LIMIT,
+            limit: config.CP_CHART_DAILY_LIMIT,
           },
         ]
       : retry
@@ -108,7 +97,7 @@ export function createMarketEngine(
       const attempts = state.failures >= 3 ? 1 : 3; // One recovery probe when the circuit opens.
       for (let attempt = 0; attempt < attempts; attempt++) {
         const windows =
-          provider.source === 'COINGECKO'
+          provider.source === 'COINPAPRIKA'
             ? budgetWindows(settings, clock.now(), category, attempt > 0)
             : [];
         if (windows.length) await store.reserve(provider.source, windows);
@@ -134,6 +123,16 @@ export function createMarketEngine(
             lastError: null,
           });
           return result as T;
+        }
+        if (
+          category === 'history' &&
+          failure.reason === 'history_unavailable'
+        ) {
+          // A free-history restriction/absence is local to this asset/range, not quote authentication.
+          throw new MarketDeferred(
+            'history_unavailable',
+            clock.now() + 24 * 3600_000,
+          );
         }
         if (failure.retryable && attempt < attempts - 1) {
           await clock.sleep(
@@ -163,8 +162,8 @@ export function createMarketEngine(
     }
   }
   const selection = (asset: CatalogAsset): Source =>
-    asset.type === 'CRYPTO' && settings.CRYPTO_DATA_MODE === 'coingecko'
-      ? 'COINGECKO'
+    asset.type === 'CRYPTO' && settings.CRYPTO_DATA_MODE === 'coinpaprika'
+      ? 'COINPAPRIKA'
       : 'DEMO';
   async function tick() {
     const assets = await store.assets();

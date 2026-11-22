@@ -1,4 +1,6 @@
-# Live crypto integration verification
+# Historical CoinGecko integration verification
+
+Superseded by [CoinPaprika verification](COINPAPRIKA-VERIFICATION.md).
 
 Status: integration and automated fixture verification complete; account-backed
 live requests, PostgreSQL acceptance and browser acceptance remain pending.

@@ -113,7 +113,9 @@ export function MarketPolicy({
   workerEnabled: boolean;
   providers?: MarketStatus['providers'];
 }) {
-  const live = providers?.find((provider) => provider.provider === 'COINGECKO');
+  const live = providers?.find(
+    (provider) => provider.provider === 'COINPAPRIKA',
+  );
   const monthly = live?.budgets.find(
     (budget) => budget.category === 'all:month',
   );
@@ -134,13 +136,13 @@ export function MarketPolicy({
           'Crypto prices are also simulated.'
         ) : (
           <>
-            Data provided by{' '}
+            Powered by{' '}
             <a
-              href="https://www.coingecko.com/en/api"
+              href="https://coinpaprika.com/api"
               target="_blank"
               rel="noreferrer"
             >
-              CoinGecko
+              CoinPaprika
             </a>
             .
           </>
@@ -152,7 +154,7 @@ export function MarketPolicy({
             ? 'Updates depend on the backend worker running.'
             : 'The market worker is disabled; cached observations may become stale.'}
         </p>
-        {cryptoMode === 'coingecko' && (
+        {cryptoMode === 'coinpaprika' && (
           <div className="live-feed-status" role="status">
             <strong>
               {live?.quoteReason
@@ -169,6 +171,10 @@ export function MarketPolicy({
               <p>Historical charts: {marketReason(live.historyReason)}</p>
             )}
             <p>
+              Free history uses hourly observations for 1D and daily
+              observations for 7D, 1M and 1Y. Availability varies by asset.
+            </p>
+            <p>
               No silent fallback to simulated crypto. Stocks remain simulated.
             </p>
             {live?.lastSuccessAt && (
@@ -181,7 +187,7 @@ export function MarketPolicy({
             )}
             {monthly && (
               <p>
-                Application live request budget remaining this account window:{' '}
+                Application live request budget remaining this UTC month:{' '}
                 {monthly.remaining}.{' '}
                 {charts &&
                   `Chart requests remaining today: ${charts.remaining}.`}

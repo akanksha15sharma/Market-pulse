@@ -84,6 +84,25 @@ test('catalog seed is idempotent and maps stocks only to the demo provider', asy
       10,
     );
     assert.equal(
+      await tx.assetProviderMapping.count({
+        where: { provider: 'COINPAPRIKA' },
+      }),
+      10,
+    );
+    const paprika = await tx.assetProviderMapping.findMany({
+      where: { provider: 'COINPAPRIKA' },
+      include: { asset: true },
+    });
+    assert.ok(paprika.every((row) => row.asset.type === 'CRYPTO'));
+    assert.equal(
+      paprika.find((row) => row.asset.symbol === 'XRP')?.providerAssetId,
+      'xrp-xrp',
+    );
+    assert.equal(
+      paprika.find((row) => row.asset.symbol === 'AVAX')?.providerAssetId,
+      'avax-avalanche',
+    );
+    assert.equal(
       await tx.assetProviderMapping.count({ where: { provider: 'DEMO' } }),
       15,
     );

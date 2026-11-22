@@ -1,6 +1,6 @@
 import {
   assetSchema,
-  HISTORY_SOURCE_MAX_AGE_MS,
+  historySourceMaxAge,
   historyResponseSchema,
   quoteSchema,
   type HistoryRange,
@@ -24,13 +24,13 @@ export function createMarketService(
   now: () => number = Date.now,
 ) {
   const source = (asset: CatalogAsset): Source =>
-    asset.type === 'CRYPTO' && config.CRYPTO_DATA_MODE === 'coingecko'
-      ? 'COINGECKO'
+    asset.type === 'CRYPTO' && config.CRYPTO_DATA_MODE === 'coinpaprika'
+      ? 'COINPAPRIKA'
       : 'DEMO';
   const mode = (provider: Source) =>
     provider === 'DEMO' ? ('DEMO' as const) : ('REAL' as const);
   function unavailableReason(provider: Source) {
-    if (provider === 'COINGECKO') {
+    if (provider === 'COINPAPRIKA') {
       try {
         budgetWindows(config, now(), 'quotes');
       } catch (error) {
@@ -155,7 +155,7 @@ export function createMarketService(
       const sourceFresh =
         sourceAt !== null &&
         sourceAt <= now() + 60_000 &&
-        now() - sourceAt <= HISTORY_SOURCE_MAX_AGE_MS[range];
+        now() - sourceAt <= historySourceMaxAge(range, provider);
       const fresh = cacheFresh && sourceFresh;
       const result = historyResponseSchema.parse({
         ...key,
@@ -163,7 +163,7 @@ export function createMarketService(
         simulated: provider === 'DEMO',
         status: usable ? (fresh ? 'fresh' : 'stale') : 'unavailable',
         refresh: cached?.pending ? 'pending' : 'idle',
-        granularity: granularity(range),
+        granularity: granularity(range, provider),
         fetchedAt: cached?.fetchedAt
           ? new Date(cached.fetchedAt).toISOString()
           : null,
@@ -191,7 +191,7 @@ export function createMarketService(
     },
     async status() {
       const providers = await Promise.all(
-        (['DEMO', 'COINGECKO'] as const).map(async (provider) => {
+        (['DEMO', 'COINPAPRIKA'] as const).map(async (provider) => {
           const state = await store.state(provider);
           let budgets: {
             category: string;
@@ -199,7 +199,7 @@ export function createMarketService(
             resetsAt: string;
           }[] = [];
           let reason: string | null = null;
-          if (provider === 'COINGECKO') {
+          if (provider === 'COINPAPRIKA') {
             try {
               budgets = (
                 await store.usage(provider, [
@@ -243,7 +243,7 @@ export function createMarketService(
               blocking ?? (exhausted('history') ? 'quota_exhausted' : null),
             enabled:
               provider === 'DEMO' ||
-              (config.CRYPTO_DATA_MODE === 'coingecko' &&
+              (config.CRYPTO_DATA_MODE === 'coinpaprika' &&
                 !reason &&
                 !state.disabled),
             disabled: state.disabled,
@@ -262,13 +262,13 @@ export function createMarketService(
         cryptoMode: config.CRYPTO_DATA_MODE,
         stockMode: 'demo',
         refreshSeconds: {
-          crypto: config.CRYPTO_DATA_MODE === 'coingecko' ? 600 : 60,
+          crypto: config.CRYPTO_DATA_MODE === 'coinpaprika' ? 600 : 60,
           stocks: 60,
         },
         workerEnabled: config.MARKET_WORKER_ENABLED,
         alwaysOn: config.MARKET_ALWAYS_ON,
         attribution:
-          'Data provided by CoinGecko when real crypto mode is enabled. Demo prices are synthetic.',
+          'Powered by CoinPaprika when real crypto mode is enabled. Demo prices are synthetic.',
         providers,
       };
     },

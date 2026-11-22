@@ -20,6 +20,7 @@ import {
   loadAsset,
   loadOverview,
   loadHistory,
+  historyInterval,
   type History,
 } from '../src/features/markets/api';
 
@@ -47,7 +48,7 @@ const stock: MarketAsset = {
 };
 const quote: QuoteDto = {
   assetId: crypto.id,
-  provider: 'COINGECKO',
+  provider: 'COINPAPRIKA',
   mode: 'REAL',
   simulated: false,
   status: 'fresh',
@@ -60,13 +61,13 @@ const quote: QuoteDto = {
 };
 const history: History = {
   assetId: crypto.id,
-  provider: 'COINGECKO',
+  provider: 'COINPAPRIKA',
   mode: 'REAL',
   simulated: false,
   status: 'fresh',
   currency: 'USD',
   range: '1D',
-  granularity: '5m',
+  granularity: '1h',
   refresh: 'idle',
   fetchedAt: date,
   reason: null,
@@ -79,15 +80,15 @@ const history: History = {
   ],
 };
 const status: MarketStatus = {
-  cryptoMode: 'coingecko',
+  cryptoMode: 'coinpaprika',
   stockMode: 'demo',
   refreshSeconds: { crypto: 600, stocks: 60 },
   workerEnabled: true,
   alwaysOn: false,
-  attribution: 'Data provided by CoinGecko',
+  attribution: 'Powered by CoinPaprika',
   providers: [
     {
-      provider: 'COINGECKO',
+      provider: 'COINPAPRIKA',
       enabled: true,
       disabled: false,
       lastError: null,
@@ -112,7 +113,7 @@ const renderCard = (value: QuoteDto) =>
 test('real, stale and unavailable price cards keep provenance and never display substitute prices', () => {
   const fresh = renderCard(quote);
   assert.match(fresh, /Real market data/);
-  assert.match(fresh, /COINGECKO/);
+  assert.match(fresh, /COINPAPRIKA/);
   assert.match(fresh, /\$123\.45/);
   assert.doesNotMatch(fresh, /Simulated data/);
   const stale = renderCard({
@@ -132,7 +133,7 @@ test('real, stale and unavailable price cards keep provenance and never display 
     reason: 'unauthorized',
   });
   assert.match(missing, /Unavailable/);
-  assert.match(missing, /authentication failed/);
+  assert.match(missing, /public provider refused access/);
   assert.match(missing, /No simulated replacement/);
   assert.doesNotMatch(missing, /\$123\.45/);
 });
@@ -140,9 +141,9 @@ test('real, stale and unavailable price cards keep provenance and never display 
 test('real charts distinguish source staleness from fetch time and hide expired cached data', () => {
   const stale = {
     ...history,
-    sourceAt: new Date(NOW - 3600_000).toISOString(),
+    sourceAt: new Date(NOW - 3 * 3600_000).toISOString(),
     points: [
-      { timestamp: new Date(NOW - 3600_000).toISOString(), price: '123' },
+      { timestamp: new Date(NOW - 3 * 3600_000).toISOString(), price: '123' },
     ],
   };
   assert.equal(historyStatus(stale, NOW), 'stale');
@@ -151,14 +152,14 @@ test('real charts distinguish source staleness from fetch time and hide expired 
   );
   assert.match(html, /Real market data/);
   assert.match(html, /stale/);
-  assert.match(html, /Data provided by/);
-  assert.match(html, /coingecko.com\/en\/api/);
+  assert.match(html, /Powered by/);
+  assert.match(html, /coinpaprika.com\/api/);
   const expired = { ...history, expiresAt: new Date(NOW - 1).toISOString() };
   assert.equal(historyStatus(expired, NOW), 'unavailable');
   const empty = renderToStaticMarkup(
     <HistoryChart history={expired} name="Bitcoin" />,
   );
-  assert.match(empty, /COINGECKO/);
+  assert.match(empty, /COINPAPRIKA/);
   assert.match(empty, /History unavailable/);
   assert.doesNotMatch(empty, /<svg|123.45/);
   assert.match(empty, /No simulated history/);
@@ -190,20 +191,20 @@ test('watchlists combine real crypto and explicitly simulated stocks without com
   );
   assert.match(html, /Real market data/);
   assert.match(html, /Simulated data/);
-  assert.match(html, /COINGECKO/);
+  assert.match(html, /COINPAPRIKA/);
   assert.match(html, /DEMO/);
 });
 
 test('live policy exposes chart-only quota exhaustion, source attribution and application budgets', () => {
   const html = renderToStaticMarkup(
     <MarketPolicy
-      cryptoMode="coingecko"
+      cryptoMode="coinpaprika"
       cryptoSeconds={600}
       workerEnabled
       providers={status.providers}
     />,
   );
-  assert.match(html, /Data provided by/);
+  assert.match(html, /Powered by/);
   assert.match(html, /Historical charts/);
   assert.match(html, /budget is exhausted/);
   assert.match(html, /7999/);
@@ -211,14 +212,14 @@ test('live policy exposes chart-only quota exhaustion, source attribution and ap
   assert.doesNotMatch(html, /Live crypto updates unavailable/);
   const unavailable = renderToStaticMarkup(
     <MarketPolicy
-      cryptoMode="coingecko"
+      cryptoMode="coinpaprika"
       cryptoSeconds={600}
       workerEnabled
-      providers={[{ ...status.providers[0]!, quoteReason: 'not_configured' }]}
+      providers={[{ ...status.providers[0]!, quoteReason: 'upstream_error' }]}
     />,
   );
   assert.match(unavailable, /Live crypto updates unavailable/);
-  assert.match(unavailable, /not configured on the server/);
+  assert.match(unavailable, /temporarily unavailable/);
 });
 
 test('public schemas reject real/demo provenance mismatches', () => {
@@ -260,7 +261,7 @@ test('dashboard and detail clients use only the backend and reject a demo quote 
     };
     assert.equal(
       (await loadOverview(new AbortController().signal)).quotes[0]?.provider,
-      'COINGECKO',
+      'COINPAPRIKA',
     );
     assert.equal(
       (await loadAsset(crypto.id, new AbortController().signal)).quote
@@ -315,10 +316,44 @@ test('detail history rejects a simulated series if the asset view selected real 
     };
     await assert.rejects(
       () =>
-        loadHistory(crypto.id, '1D', new AbortController().signal, 'COINGECKO'),
+        loadHistory(
+          crypto.id,
+          '1D',
+          new AbortController().signal,
+          'COINPAPRIKA',
+        ),
       /mode changed/,
     );
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('unavailable free history exposes its limitation instead of promising preparation or rendering a fake chart', () => {
+  const html = renderToStaticMarkup(
+    <HistoryChart
+      history={{
+        ...history,
+        range: '1M',
+        granularity: '1d',
+        points: [],
+        status: 'unavailable',
+        refresh: 'pending',
+        reason: 'history_unavailable',
+      }}
+      name="Bitcoin"
+    />,
+  );
+  assert.match(html, /History unavailable/);
+  assert.match(html, /free public API/);
+  assert.doesNotMatch(html, /Preparing price history|<svg/);
+  assert.match(html, /COINPAPRIKA/);
+  assert.equal(
+    historyInterval({
+      ...history,
+      refresh: 'pending',
+      reason: 'history_unavailable',
+    }),
+    60_000,
+  );
 });

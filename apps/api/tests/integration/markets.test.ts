@@ -63,7 +63,7 @@ test('cached quotes survive repository recreation, preserve real/demo separation
   const assetId = await asset();
   const quote = {
     assetId,
-    provider: 'COINGECKO' as const,
+    provider: 'COINPAPRIKA' as const,
     mode: 'REAL' as const,
     price: '123.123456789012345678',
     changePercent: null,
@@ -80,8 +80,44 @@ test('cached quotes survive repository recreation, preserve real/demo separation
   );
   assert.equal(rows.length, 2);
   assert.equal(
-    rows.find((row) => row.provider === 'COINGECKO')?.price,
+    rows.find((row) => row.provider === 'COINPAPRIKA')?.price,
     quote.price,
+  );
+});
+
+test('legacy CoinGecko caches remain untouched and are excluded from active free-provider reads', async () => {
+  const assetId = await asset();
+  await db.latestQuote.create({
+    data: {
+      assetId,
+      provider: 'COINGECKO',
+      mode: 'REAL',
+      currency: 'USD',
+      price: '999',
+      sourceAt: new Date(now),
+      fetchedAt: new Date(now),
+    },
+  });
+  await store.saveQuotes([
+    {
+      assetId,
+      provider: 'COINPAPRIKA',
+      mode: 'REAL',
+      price: '123',
+      changePercent: null,
+      sourceAt: now,
+      fetchedAt: now,
+    },
+  ]);
+  const active = (await store.quotes()).filter(
+    (row) => row.assetId === assetId,
+  );
+  assert.equal(active.length, 1);
+  assert.equal(active[0]?.provider, 'COINPAPRIKA');
+  assert.equal(active[0]?.price, '123.000000000000000000');
+  assert.equal(
+    await db.latestQuote.count({ where: { assetId, provider: 'COINGECKO' } }),
+    1,
   );
 });
 
@@ -93,7 +129,7 @@ test('concurrent quota reservations respect limits and roll back all windows ato
   ];
   categories.push(...windows.map((window) => window.category));
   const results = await Promise.allSettled(
-    Array.from({ length: 6 }, () => store.reserve('COINGECKO', windows)),
+    Array.from({ length: 6 }, () => store.reserve('COINPAPRIKA', windows)),
   );
   assert.equal(
     results.filter((result) => result.status === 'fulfilled').length,
@@ -102,11 +138,11 @@ test('concurrent quota reservations respect limits and roll back all windows ato
   for (const result of results)
     if (result.status === 'rejected')
       assert.ok(result.reason instanceof MarketDeferred);
-  const usage = await createMarketRepository(db).usage('COINGECKO', windows);
+  const usage = await createMarketRepository(db).usage('COINPAPRIKA', windows);
   assert.ok(usage.every((row) => row.used === 2));
-  await store.settle('COINGECKO', windows);
+  await store.settle('COINPAPRIKA', windows);
   assert.ok(
-    (await store.usage('COINGECKO', windows)).every((row) => row.used === 2),
+    (await store.usage('COINPAPRIKA', windows)).every((row) => row.used === 2),
   );
 });
 
