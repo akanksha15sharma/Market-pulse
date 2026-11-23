@@ -20,7 +20,11 @@ const config: AuthConfig = {
   secure: false,
   ttlSeconds: 3600,
 };
-function fixture(overrides: Partial<AuthService> = {}, settings = config) {
+function fixture(
+  overrides: Partial<AuthService> = {},
+  settings = config,
+  options: Parameters<typeof createApp>[5] = {},
+) {
   const user = {
     id: randomUUID(),
     email: 'user@example.test',
@@ -49,7 +53,11 @@ function fixture(overrides: Partial<AuthService> = {}, settings = config) {
     reset: async () => {},
     ...overrides,
   };
-  return { app: createApp(auth, settings), user, token };
+  return {
+    app: createApp(auth, settings, undefined, undefined, undefined, options),
+    user,
+    token,
+  };
 }
 
 test('password hashes are salted, verify correctly, and do not accept malformed hashes', async () => {
@@ -325,4 +333,77 @@ test('production cookies have the __Host prefix and Secure; auth responses are n
         !cookie.includes('Domain='),
     ),
   );
+});
+
+test('readiness checks database connectivity without changing liveness or exposing errors', async () => {
+  let failing = false;
+  let checks = 0;
+  const { app } = fixture(
+    {},
+    { ...config, secure: true },
+    {
+      readiness: async () => {
+        checks++;
+        if (failing) throw new Error('database password should stay private');
+      },
+    },
+  );
+  const live = await request(app, 'GET', '/api/v1/health/live');
+  assert.equal(live.status, 200);
+  assert.equal(checks, 0);
+  assert.equal(live.headers['cache-control'], 'no-store');
+  const ready = await request(app, 'GET', '/api/v1/health/ready');
+  assert.equal(ready.status, 200);
+  assert.equal(checks, 1);
+  assert.equal(ready.headers['strict-transport-security'], 'max-age=31536000');
+  failing = true;
+  const unavailable = await request(app, 'GET', '/api/v1/health/ready');
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.headers['cache-control'], 'no-store');
+  assert.equal(unavailable.headers['retry-after'], '30');
+  assert.deepEqual(unavailable.body, {
+    status: 'unavailable',
+    service: 'marketpulse-api',
+  });
+  assert.equal((await request(app, 'GET', '/api/v1/health/live')).status, 200);
+  assert.equal(
+    (await request(fixture().app, 'GET', '/api/v1/health/ready')).status,
+    503,
+  );
+});
+
+test('rate limiting ignores forwarded IPs unless the immediate proxy is explicitly trusted', async () => {
+  for (const [trustedProxies, forwarded, expected] of [
+    [[], '203.0.113.7', '127.0.0.1'],
+    [['10.0.0.1'], '203.0.113.7', '127.0.0.1'],
+    [['127.0.0.1'], '203.0.113.7', '203.0.113.7'],
+    [['127.0.0.0/8'], '198.51.100.8, 203.0.113.7', '203.0.113.7'],
+  ] as const) {
+    const keys: string[] = [];
+    const { app } = fixture(
+      {
+        limit: async (key) => {
+          keys.push(key);
+        },
+      },
+      config,
+      { trustedProxies: [...trustedProxies] },
+    );
+    const jar = cookieJar();
+    const csrf = await request(app, 'GET', '/api/v1/auth/csrf');
+    jar.update(csrf.headers);
+    await request(
+      app,
+      'POST',
+      '/api/v1/auth/login',
+      {
+        origin: config.origin,
+        cookie: jar.header(),
+        'x-csrf-token': csrf.body.csrfToken as string,
+        'x-forwarded-for': forwarded,
+      },
+      { email: 'user@example.test', password: 'wrong passphrase' },
+    );
+    assert.equal(keys[0], digest(`ip:${expected}:/login`));
+  }
 });

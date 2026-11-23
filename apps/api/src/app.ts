@@ -13,7 +13,7 @@ import type { ErrorRequestHandler } from 'express';
 import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 import { healthResponseSchema } from '@marketpulse/contracts';
-import { authConfig, type AuthConfig } from './config/env.js';
+import { authConfig, env, type AuthConfig } from './config/env.js';
 import { HttpError } from './lib/http-error.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { sessionToken } from './modules/auth/security.js';
@@ -30,13 +30,19 @@ export function createApp(
   market?: MarketService,
   watchlists?: WatchlistService,
   alerts?: AlertService,
+  options: { trustedProxies?: string[]; readiness?: () => Promise<void> } = {},
 ) {
   const app = express();
   app.disable('x-powered-by');
-  // Trust no forwarded client IPs by default; configure a known proxy at deployment.
+  // Trust only the configured proxy addresses; never enable blanket header trust.
+  app.set(
+    'trust proxy',
+    options.trustedProxies?.length ? options.trustedProxies : false,
+  );
   app.use((req, res, next) => {
     res.set({
       'X-Request-ID': randomUUID(),
+      'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
       'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
@@ -56,6 +62,18 @@ export function createApp(
     res.json(
       healthResponseSchema.parse({ status: 'ok', service: 'marketpulse-api' }),
     );
+  });
+  app.get('/api/v1/health/ready', async (_req, res) => {
+    try {
+      if (!options.readiness) throw new Error('Readiness is not configured');
+      await options.readiness();
+      res.json({ status: 'ok', service: 'marketpulse-api' });
+    } catch {
+      res.set('Retry-After', '30');
+      res
+        .status(503)
+        .json({ status: 'unavailable', service: 'marketpulse-api' });
+    }
   });
   app.use('/api/v1/auth', authRoutes(auth, config));
   if (watchlists)
@@ -143,4 +161,10 @@ export const app = createApp(
   lazyMarket,
   lazyWatchlists,
   lazyAlerts,
+  {
+    trustedProxies: env.TRUSTED_PROXIES,
+    readiness: async () => {
+      await getDatabaseClient().$queryRaw`SELECT 1`;
+    },
+  },
 );
