@@ -1,0 +1,37 @@
+# Template only. Importing a Blueprint creates/deploys a service: approval required.
+# No database or paid background worker is provisioned by this file.
+services:
+  - type: web
+    name: marketpulse-api
+    runtime: node
+    plan: free
+    autoDeployTrigger: off
+    buildCommand: npm ci --include=dev && npm run build -w @marketpulse/contracts && npm run build -w @marketpulse/api
+    startCommand: npm start
+    # A platform probe must not keep an otherwise idle Neon database awake.
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: TRUSTED_PROXIES
+        sync: false
+      - key: EMAIL_MODE
+        value: disabled
+      - key: CRYPTO_DATA_MODE
+        value: coinpaprika
+      - key: STOCK_DATA_MODE
+        value: demo
+      - key: MARKET_WORKER_ENABLED
+        value: 'true'
+      - key: MARKET_ALWAYS_ON
+        value: 'false'
