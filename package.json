@@ -43,7 +43,8 @@
     "test:config": "npm run test:config -w @marketpulse/api",
     "production:check": "npm run production:check -w @marketpulse/api",
     "start": "npm run production:check && npm run start -w @marketpulse/api",
-    "start:worker": "npm run worker:start -w @marketpulse/api"
+    "start:worker": "npm run worker:start -w @marketpulse/api",
+    "worker:once": "npm run worker:once -w @marketpulse/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

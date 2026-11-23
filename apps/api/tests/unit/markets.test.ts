@@ -914,3 +914,49 @@ test('partial free ticker batches preserve missing observations and reject inval
   );
   assert.equal(calls, 0);
 });
+
+test('one-shot worker ingests a batch without starting a scheduler and closes its database', async () => {
+  const { runMarketOnce } =
+    await import('../../src/modules/markets/run-once.js');
+  const store = memoryStore();
+  const engine = createMarketEngine(store.store, providers(), demo, clock());
+  let disconnected = false;
+  await runMarketOnce(demo, () => ({
+    tick: engine.tick,
+    disconnect: async () => {
+      disconnected = true;
+    },
+  }));
+  assert.equal(disconnected, true);
+  assert.equal((await store.store.quotes()).length, 15);
+});
+
+test('one-shot worker refuses disabled ingestion and closes resources on failure', async () => {
+  const { runMarketOnce } =
+    await import('../../src/modules/markets/run-once.js');
+  let connections = 0;
+  let closes = 0;
+  const failure = new Error('batch failed');
+  const connect = () => {
+    connections++;
+    return {
+      tick: async () => {
+        throw failure;
+      },
+      disconnect: async () => {
+        closes++;
+      },
+    };
+  };
+  await assert.rejects(
+    () => runMarketOnce({ ...demo, MARKET_WORKER_ENABLED: false }, connect),
+    /MARKET_WORKER_ENABLED/,
+  );
+  assert.equal(connections, 0);
+  await assert.rejects(
+    () => runMarketOnce(demo, connect),
+    (error) => error === failure,
+  );
+  assert.equal(connections, 1);
+  assert.equal(closes, 1);
+});

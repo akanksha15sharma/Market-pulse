@@ -27,7 +27,8 @@
     "test:alerts": "node --import tsx --test --test-concurrency=1 tests/unit/alerts.test.ts",
     "test:alerts:db": "node --import tsx --test --test-concurrency=1 tests/integration/alerts.test.ts",
     "test:config": "node --import tsx --test --test-concurrency=1 tests/unit/config.test.ts",
-    "production:check": "node dist/tools/check-production.js"
+    "production:check": "node dist/tools/check-production.js",
+    "worker:once": "node dist/tools/run-market-once.js"
   },
   "dependencies": {
     "@marketpulse/contracts": "*",

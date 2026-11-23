@@ -1,0 +1,44 @@
+name: Optional free background alerts
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: free-market-alerts
+  cancel-in-progress: false
+jobs:
+  market-batch:
+    # No work or connections until explicitly enabled after deployment approval.
+    # Standard public-repository runners are free; never spend private minutes here.
+    if: >-
+      vars.ENABLE_FREE_ALERTS == 'true' &&
+      github.event.repository.private == false &&
+      github.event.repository.visibility == 'public' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci --include=dev
+      - run: npm run build -w @marketpulse/contracts
+      - run: npm run build -w @marketpulse/api
+      - name: Run one bounded batch and disconnect from PostgreSQL
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.FREE_ALERTS_DATABASE_URL }}
+          CRYPTO_DATA_MODE: coinpaprika
+          STOCK_DATA_MODE: demo
+          MARKET_WORKER_ENABLED: 'true'
+          MARKET_ALWAYS_ON: 'false'
+          CP_MINUTE_ATTEMPT_LIMIT: '10'
+          CP_DAILY_ATTEMPT_LIMIT: '260'
+          CP_MONTHLY_ATTEMPT_LIMIT: '8000'
+          CP_CHART_DAILY_LIMIT: '80'
+        run: npm run worker:once
