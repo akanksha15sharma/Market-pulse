@@ -48,6 +48,16 @@ export function createApp(
       'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
     });
     if (config.secure) res.set('Strict-Transport-Security', 'max-age=31536000');
+    next();
+  });
+  // Public, stateless liveness must also work for cross-site browser visits.
+  // Express includes HEAD here; all other routes/methods retain origin checks.
+  app.get('/api/v1/health/live', (_req, res) => {
+    res.json(
+      healthResponseSchema.parse({ status: 'ok', service: 'marketpulse-api' }),
+    );
+  });
+  app.use((req, _res, next) => {
     if (
       (req.get('origin') && req.get('origin') !== config.origin) ||
       req.get('sec-fetch-site') === 'cross-site' ||
@@ -58,11 +68,6 @@ export function createApp(
     next();
   });
   app.use(express.json({ limit: '16kb', type: 'application/json' }));
-  app.get('/api/v1/health/live', (_req, res) => {
-    res.json(
-      healthResponseSchema.parse({ status: 'ok', service: 'marketpulse-api' }),
-    );
-  });
   app.get('/api/v1/health/ready', async (_req, res) => {
     try {
       if (!options.readiness) throw new Error('Readiness is not configured');

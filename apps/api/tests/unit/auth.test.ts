@@ -335,6 +335,98 @@ test('production cookies have the __Host prefix and Secure; auth responses are n
   );
 });
 
+test('public liveness accepts browser and platform probes without exposing session data', async () => {
+  const { app } = fixture(
+    {},
+    {
+      ...config,
+      origin: 'https://marketpulse.vercel.app',
+      secure: true,
+    },
+  );
+  const probes: Record<string, string>[] = [
+    {},
+    { 'sec-fetch-site': 'none' },
+    { 'sec-fetch-site': 'cross-site' },
+    { origin: 'https://untrusted.example', 'sec-fetch-site': 'cross-site' },
+    { origin: 'null' },
+  ];
+  for (const headers of probes) {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await request(
+        app,
+        method,
+        '/api/v1/health/live',
+        headers,
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual(
+        response.body,
+        method === 'HEAD'
+          ? {}
+          : {
+              status: 'ok',
+              service: 'marketpulse-api',
+            },
+      );
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.equal(
+        response.headers['strict-transport-security'],
+        'max-age=31536000',
+      );
+      assert.equal(response.headers['set-cookie'], undefined);
+      assert.equal(response.headers['access-control-allow-origin'], undefined);
+    }
+  }
+});
+
+test('public liveness does not bypass origin restrictions for other routes or methods', async () => {
+  const origin = 'https://marketpulse.vercel.app';
+  const { app, token } = fixture({}, { ...config, origin, secure: true });
+  const rejectedHeaders: Record<string, string>[] = [
+    { origin: 'https://untrusted.example' },
+    { origin: 'https://marketpulse.vercel.app.attacker.example' },
+    { origin: 'null' },
+    { 'sec-fetch-site': 'cross-site' },
+    { origin, 'sec-fetch-site': 'cross-site' },
+  ];
+  for (const headers of rejectedHeaders) {
+    for (const [method, path] of [
+      ['GET', '/api/v1/auth/csrf'],
+      ['GET', '/api/v1/private/profile'],
+      ['GET', '/api/v1/health/ready'],
+      ['GET', '/api/v1/health/live/extra'],
+      ['POST', '/api/v1/health/live'],
+      ['OPTIONS', '/api/v1/health/live'],
+      ['POST', '/api/v1/auth/logout'],
+    ] as const) {
+      const response = await request(app, method, path, headers);
+      assert.equal(response.status, 403, `${method} ${path}`);
+      assert.equal(response.body.error, 'Request origin is not allowed');
+    }
+  }
+  assert.equal((await request(app, 'POST', '/api/v1/auth/logout')).status, 403);
+  assert.equal((await request(app, 'POST', '/api/v1/health/live')).status, 403);
+  assert.equal(
+    (await request(app, 'GET', '/api/v1/auth/csrf', { origin })).status,
+    200,
+  );
+  assert.equal(
+    (
+      await request(app, 'GET', '/api/v1/private/profile', {
+        origin,
+        cookie: `__Host-mp_session=${token}`,
+      })
+    ).status,
+    200,
+  );
+  // Matching the frontend origin still does not replace CSRF validation.
+  assert.equal(
+    (await request(app, 'POST', '/api/v1/auth/logout', { origin })).status,
+    403,
+  );
+});
+
 test('readiness checks database connectivity without changing liveness or exposing errors', async () => {
   let failing = false;
   let checks = 0;
