@@ -184,11 +184,22 @@ use. Do not guess network ranges, trust all headers, or relax CSRF/origin checks
 
 ### 3. Frontend and same-origin authentication
 
-Review the Vercel example with project root set to the **repository root**. Replace
-only its placeholder API origin with the approved HTTPS Render origin. After
-approval, it can become the project's active `vercel.json`. Keep Git automatic
-deployments disabled until separately approved. The frontend build intentionally
-builds contracts and web only; it needs no database URL or CSRF secret.
+The active root `vercel.json` proxies `/api/:path*` to
+`https://market-pulse-r246.onrender.com/api/:path*`, followed by the SPA fallback.
+Set the Vercel project root to the **repository root** so this configuration and
+the workspace build commands apply. Redeploy the frontend to apply routing changes;
+an existing deployment URL retains its deployed configuration. The generic
+`deploy/vercel.example.json` remains a template for other environments. Git
+automatic deployments remain disabled. The frontend build intentionally builds
+contracts and web only; it needs no database URL or CSRF secret.
+
+If a deployment redirects API checks to Vercel SSO, verify it in an authenticated
+browser or through authorized Vercel access. Do not disable deployment protection
+to diagnose application routing. A successful `/api/v1/assets?limit=15` response
+with `assets: []` and `total: 0` means the connected database has no active catalog
+assets. Apply the documented catalog seed to the intended production database as
+a release operation; the rewrite does not seed data and startup never migrates or
+seeds automatically.
 
 The API rewrite must precede SPA fallback. Browsers continue to call relative
 `/api/v1` paths on the Vercel origin; no cross-site-cookie or permissive CORS change

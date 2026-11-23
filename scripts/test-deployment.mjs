@@ -37,6 +37,48 @@ test('Vercel template keeps API requests before SPA fallback and builds only the
   assert.equal(config.env, undefined);
 });
 
+test('active Vercel config proxies every API path to Render before the SPA fallback', async () => {
+  const config = JSON.parse(await read('vercel.json'));
+  const template = JSON.parse(await read('deploy/vercel.example.json'));
+  template.rewrites[0].destination =
+    'https://market-pulse-r246.onrender.com/api/:path*';
+  // Preserve the reviewed build, cache, security-header, and deploy settings.
+  assert.deepEqual(config, template);
+  const [api, spa] = config.rewrites;
+  for (const path of [
+    '/api/v1/assets?limit=15',
+    '/api/v1/quotes',
+    '/api/v1/market-status',
+    '/api/v1/auth/csrf',
+    '/api/v1/auth/login',
+    '/api/v1/watchlists',
+    '/api/v1/alerts',
+  ]) {
+    const match = /^\/api\/(.*)$/.exec(path);
+    assert.ok(match);
+    const destination = api.destination.replace(':path*', match[1]);
+    assert.equal(
+      new URL(destination).origin,
+      'https://market-pulse-r246.onrender.com',
+    );
+    assert.equal(
+      new URL(destination).pathname + new URL(destination).search,
+      path,
+    );
+  }
+  for (const path of ['/markets', '/assets/asset-id', '/login'])
+    assert.equal(/^\/api\//.test(path), false);
+  assert.equal(spa.source, '/(.*)');
+  assert.equal(spa.destination, '/index.html');
+  assert.ok(
+    config.headers.every((rule) =>
+      rule.headers.every(
+        (header) => !/^access-control-allow-/i.test(header.key),
+      ),
+    ),
+  );
+});
+
 test('Render template opts into free compute, disables automatic deploys, and never migrates on startup', async () => {
   const template = await read('deploy/render.example.yaml');
   assert.match(template, /plan: free/);
