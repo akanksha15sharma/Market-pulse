@@ -1051,3 +1051,7 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+.market-loading.is-refreshing {
+  padding: 0.5rem 1rem;
+}

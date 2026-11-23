@@ -103,7 +103,7 @@ export function AlertsPage() {
           Saving alert changes…
         </p>
       )}
-      {market.loading && <MarketLoading />}
+      {market.loading && <MarketLoading refreshing={!!market.data} />}
       {market.error && (
         <ResourceError message={market.error} retry={market.retry} />
       )}

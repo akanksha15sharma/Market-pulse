@@ -65,7 +65,7 @@ export function MarketDashboardPage() {
           Curated catalog<span>10 crypto · 5 simulated stocks</span>
         </span>
       </div>
-      {loading && <MarketLoading />}
+      {loading && <MarketLoading refreshing={!!data} />}
       {error && <ResourceError message={error} retry={retry} />}
       {data && (
         <>

@@ -222,7 +222,7 @@ export function WatchlistsPage() {
                     Rename
                   </button>
                 </fetcher.Form>
-                {market.loading && <MarketLoading />}
+                {market.loading && <MarketLoading refreshing={!!market.data} />}
                 {market.error && (
                   <ResourceError message={market.error} retry={market.retry} />
                 )}

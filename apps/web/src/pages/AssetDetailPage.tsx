@@ -58,7 +58,7 @@ function AssetDetail({ id }: { id: string }) {
       <Link className="back-link" to="/markets">
         All markets
       </Link>
-      {asset.loading && <MarketLoading />}
+      {asset.loading && <MarketLoading refreshing={!!asset.data} />}
       {asset.error && (
         <ResourceError message={asset.error} retry={asset.retry} />
       )}
@@ -154,7 +154,7 @@ function AssetHistory({
   );
   return (
     <>
-      {loading && <MarketLoading />}
+      {loading && <MarketLoading refreshing={!!data} />}
       {error && <ResourceError message={error} retry={retry} />}
       {data && (
         <Suspense fallback={<MarketLoading />}>

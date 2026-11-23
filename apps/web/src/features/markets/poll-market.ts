@@ -10,6 +10,7 @@ export function pollMarket<T>(
     Document,
     'hidden' | 'addEventListener' | 'removeEventListener'
   > = document,
+  start: () => void = () => {},
 ) {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -25,6 +26,7 @@ export function pollMarket<T>(
     }
     running = true;
     try {
+      start();
       data = await request(controller.signal);
       if (!controller.signal.aborted) receive(data);
     } catch (error) {

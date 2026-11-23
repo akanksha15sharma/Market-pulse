@@ -96,11 +96,20 @@ export function ResourceError({
     </div>
   );
 }
-export function MarketLoading() {
+export function MarketLoading({
+  refreshing = false,
+}: {
+  refreshing?: boolean;
+}) {
   return (
-    <div className="market-loading" role="status">
-      <span className="loading-bar" />
-      Loading the latest cached observations…
+    <div
+      className={`market-loading${refreshing ? ' is-refreshing' : ''}`}
+      role="status"
+    >
+      <span className="loading-bar" aria-hidden="true" />
+      {refreshing
+        ? 'Refreshing cached observations…'
+        : 'Loading the latest cached observations…'}
     </div>
   );
 }

@@ -1,4 +1,8 @@
 import {
+  initialResourceState,
+  resourceReducer,
+} from '../src/features/markets/resource-state';
+import {
   AssetInformation,
   HistoryRangeFilters,
 } from '../src/features/markets/AssetInformation';
@@ -23,6 +27,7 @@ import type { MarketAsset, QuoteDto } from '@marketpulse/contracts';
 import { pollMarket } from '../src/features/markets/poll-market';
 import { HistoryChart } from '../src/features/markets/HistoryChart';
 import {
+  MarketLoading,
   MarketPolicy,
   MarketSourcePolicy,
   QuoteCard,
@@ -750,4 +755,111 @@ test('real historical charts retain source attribution, interactive controls, an
   assert.match(html, /aria-valuetext=/);
   assert.match(html, /Coverage may be shorter/);
   assert.doesNotMatch(html, /Simulated data/);
+});
+
+test('market resources expose retry progress, retain cached observations, and clear errors on recovery', () => {
+  const request = async () => 1;
+  let state = initialResourceState(request);
+  assert.equal(state.loading, true);
+  state = resourceReducer(state, {
+    type: 'failure',
+    request,
+    error: 'Offline',
+  });
+  assert.equal(state.loading, false);
+  assert.equal(state.error, 'Offline');
+  state = resourceReducer(state, { type: 'start', request });
+  assert.equal(state.loading, true);
+  assert.equal(state.error, null);
+  state = resourceReducer(state, {
+    type: 'success',
+    request,
+    data: 1,
+    checkedAt: timestamp,
+  });
+  state = resourceReducer(state, { type: 'start', request });
+  assert.equal(state.loading, true);
+  assert.equal(state.data, 1);
+  assert.equal(state.checkedAt, timestamp);
+  state = resourceReducer(state, {
+    type: 'failure',
+    request,
+    error: 'Unavailable',
+  });
+  assert.equal(state.data, 1);
+  assert.equal(state.checkedAt, timestamp);
+  assert.equal(state.loading, false);
+  state = resourceReducer(state, {
+    type: 'success',
+    request,
+    data: 2,
+    checkedAt: 'new check',
+  });
+  assert.equal(state.data, 2);
+  assert.equal(state.error, null);
+  assert.equal(state.checkedAt, 'new check');
+  const otherRequest = async () => 3;
+  state = resourceReducer(state, { type: 'start', request: otherRequest });
+  assert.equal(state.loading, true);
+  assert.equal(state.data, null);
+  assert.equal(state.checkedAt, null);
+});
+
+test('polling reports progress only for real requests, respects hidden tabs and cooldown, and stops after cleanup', async (context) => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
+  const visibility = new Visibility();
+  visibility.hidden = true;
+  const events: string[] = [];
+  let calls = 0;
+  const stop = pollMarket(
+    async () => {
+      events.push('request');
+      if (++calls === 1) throw new MarketRequestError('Rate limited', 120_000);
+      return 1;
+    },
+    60_000,
+    () => events.push('success'),
+    () => events.push('failure'),
+    visibility,
+    () => events.push('start'),
+  );
+  try {
+    assert.deepEqual(events, []);
+    visibility.change(false);
+    await nextTurn();
+    assert.deepEqual(events, ['start', 'request', 'failure']);
+    visibility.change(true);
+    visibility.change(false);
+    context.mock.timers.tick(119_999);
+    await nextTurn();
+    assert.equal(events.length, 3);
+    context.mock.timers.tick(1);
+    await nextTurn();
+    assert.deepEqual(events, [
+      'start',
+      'request',
+      'failure',
+      'start',
+      'request',
+      'success',
+    ]);
+    stop();
+    context.mock.timers.tick(120_000);
+    await nextTurn();
+    assert.equal(events.length, 6);
+  } finally {
+    stop();
+    context.mock.timers.reset();
+  }
+});
+
+test('loading status distinguishes first load from a refresh with cached observations', () => {
+  const initial = renderToStaticMarkup(<MarketLoading />);
+  assert.match(initial, /role="status"/);
+  assert.match(initial, /Loading the latest cached observations/);
+  const refreshing = renderToStaticMarkup(<MarketLoading refreshing />);
+  assert.match(refreshing, /role="status"/);
+  assert.match(refreshing, /is-refreshing/);
+  assert.match(refreshing, /Refreshing cached observations/);
+  assert.match(refreshing, /aria-hidden="true"/);
 });

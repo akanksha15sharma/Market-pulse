@@ -1,43 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { MarketRequestError } from './api';
 import { pollMarket } from './poll-market';
+import { initialResourceState, resourceReducer } from './resource-state';
 
 export function useMarketResource<T>(
   request: (signal: AbortSignal) => Promise<T>,
   interval: number | ((data: T | null) => number) = 60_000,
 ) {
   const [revision, setRevision] = useState(0);
-  const [state, setState] = useState<{
-    request: typeof request;
-    data: T | null;
-    error: string | null;
-    loading: boolean;
-    checkedAt: string | null;
-  }>({ request, data: null, error: null, loading: true, checkedAt: null });
+  const [state, dispatch] = useReducer(
+    resourceReducer<T>,
+    request,
+    initialResourceState<T>,
+  );
   useEffect(
     () =>
       pollMarket(
         request,
         interval,
         (data) =>
-          setState({
+          dispatch({
+            type: 'success',
             request,
             data,
-            error: null,
-            loading: false,
             checkedAt: new Date().toISOString(),
           }),
         (error) =>
-          setState((previous) => ({
+          dispatch({
+            type: 'failure',
             request,
-            data: previous.request === request ? previous.data : null,
-            checkedAt: previous.request === request ? previous.checkedAt : null,
             error:
               error instanceof MarketRequestError
                 ? error.message
                 : 'Could not load market data. Check your connection and try again.',
-            loading: false,
-          })),
+          }),
+        undefined,
+        () => dispatch({ type: 'start', request }),
       ),
     [request, interval, revision],
   );
