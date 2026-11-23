@@ -362,6 +362,69 @@ test('optional status failures do not hide valid prices on overview or detail; r
   }
 });
 
+test('missing API routes and SPA fallback responses are not reported as missing assets', async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const response of [
+      new Response('NOT_FOUND', { status: 404 }),
+      new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }),
+      new Response(JSON.stringify({ error: 'Asset not found' }), {
+        status: 404,
+      }),
+      new Response('<!doctype html><html>MarketPulse</html>'),
+    ]) {
+      globalThis.fetch = async () => response.clone();
+      await assert.rejects(
+        () => loadOverview(new AbortController().signal),
+        (error: unknown) =>
+          error instanceof MarketRequestError &&
+          /Market API/.test(error.message) &&
+          !/Asset not found/.test(error.message),
+      );
+    }
+    for (const [body, expected] of [
+      ['NOT_FOUND', /Market API route is unavailable/],
+      [
+        JSON.stringify({ error: 'Not found' }),
+        /Market API route is unavailable/,
+      ],
+      [
+        JSON.stringify({ error: 'Asset not found' }),
+        /Asset not found in the catalog/,
+      ],
+    ] as const) {
+      globalThis.fetch = async () => new Response(body, { status: 404 });
+      await assert.rejects(
+        () => loadAsset(id, new AbortController().signal),
+        expected,
+      );
+    }
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('an empty catalog is a successful empty response rather than a missing asset', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) =>
+      new Response(
+        JSON.stringify(
+          String(input).includes('/quotes')
+            ? { quotes: [] }
+            : String(input).includes('/market-status')
+              ? status
+              : { assets: [], total: 0 },
+        ),
+      );
+    const overview = await loadOverview(new AbortController().signal);
+    assert.deepEqual(overview.assets, []);
+    assert.deepEqual(overview.quotes, []);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test('essential quote failures still reject rather than invent prices', async () => {
   const original = globalThis.fetch;
   try {

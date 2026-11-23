@@ -463,6 +463,37 @@ test('REST validates filters/ranges/IDs, hides provider mappings and returns exp
   assert.ok(!JSON.stringify(status.body).includes('synthetic-secret'));
 });
 
+test('empty catalogs return successful collections while missing assets and routes have distinct 404s', async () => {
+  const market = createMarketService(memoryStore([]).store, demo);
+  const app = createApp(
+    { limit: async () => {} } as unknown as AuthService,
+    {
+      origin: 'https://marketpulse.vercel.app',
+      secret: 'a'.repeat(64),
+      secure: true,
+      ttlSeconds: 3600,
+    },
+    market,
+  );
+  const catalog = await request(app, 'GET', '/api/v1/assets?limit=15');
+  assert.equal(catalog.status, 200);
+  assert.deepEqual(catalog.body.assets, []);
+  assert.equal(catalog.body.total, 0);
+  const quotes = await request(app, 'GET', '/api/v1/quotes');
+  assert.equal(quotes.status, 200);
+  assert.deepEqual(quotes.body.quotes, []);
+  const missing = await request(
+    app,
+    'GET',
+    '/api/v1/assets/00000000-0000-4000-8000-000000000001',
+  );
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.error, 'Asset not found');
+  const route = await request(app, 'GET', '/api/v1/unknown');
+  assert.equal(route.status, 404);
+  assert.equal(route.body.error, 'Not found');
+});
+
 test('a late history reader cannot requeue or hide a concurrently completed refresh', async () => {
   const fixture = memoryStore();
   const enqueue = fixture.store.enqueue;

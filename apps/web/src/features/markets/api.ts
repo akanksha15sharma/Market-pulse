@@ -59,14 +59,31 @@ async function read<T>(
       throw new MarketRequestError(
         'Your session expired. Sign in again to load history.',
       );
-    if (response.status === 404)
-      throw new MarketRequestError('Asset not found in the catalog.');
+    if (response.status === 404) {
+      const body: unknown = await response.json().catch(() => null);
+      if (
+        /^\/assets\/[^/?]+(?:\/history)?(?:\?|$)/.test(path) &&
+        body !== null &&
+        typeof body === 'object' &&
+        'error' in body &&
+        body.error === 'Asset not found'
+      )
+        throw new MarketRequestError('Asset not found in the catalog.');
+      throw new MarketRequestError(
+        'Market API route is unavailable. Please try again later.',
+      );
+    }
     throw new MarketRequestError(
       'Market data is temporarily unavailable. Please try again.',
     );
   }
   // 202 contains the same typed history response, with refresh=pending.
-  return schema.parse(await response.json());
+  const body: unknown = await response.json().catch(() => {
+    throw new MarketRequestError(
+      'Market API returned an unexpected response. Please try again later.',
+    );
+  });
+  return schema.parse(body);
 }
 function validateSelection(
   assets: z.infer<typeof assetSchema>[],
