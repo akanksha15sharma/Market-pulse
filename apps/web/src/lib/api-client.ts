@@ -28,7 +28,15 @@ export async function api<T>(
         csrf.status,
         'Could not secure the request. Try again.',
       );
-    const data = (await csrf.json()) as { csrfToken: string };
+    const data: unknown = await csrf.json().catch(() => null);
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !('csrfToken' in data) ||
+      typeof data.csrfToken !== 'string' ||
+      !data.csrfToken.trim()
+    )
+      throw new ApiError(0, 'Could not secure the request. Try again.');
     headers['X-CSRF-Token'] = data.csrfToken;
     headers['Content-Type'] = 'application/json';
   }
@@ -51,12 +59,25 @@ export async function api<T>(
     );
   }
   if (response.status === 204) return undefined as T;
-  const body = (await response
-    .json()
-    .catch(() => ({ error: 'Unexpected server response. Try again.' }))) as {
-    error?: string;
-  };
-  if (!response.ok)
-    throw new ApiError(response.status, body.error ?? 'Request failed');
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new ApiError(
+      response.ok ? 502 : response.status,
+      'Unexpected server response. Try again.',
+    );
+  }
+  if (!response.ok) {
+    const message =
+      body &&
+      typeof body === 'object' &&
+      'error' in body &&
+      typeof body.error === 'string' &&
+      body.error.trim()
+        ? body.error
+        : 'Request failed. Try again.';
+    throw new ApiError(response.status, message);
+  }
   return body as T;
 }
