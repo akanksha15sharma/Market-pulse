@@ -22,6 +22,18 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+      - name: Validate compiled production preflight without external services
+        env:
+          NODE_ENV: production
+          APP_ORIGIN: https://marketpulse.example
+          # Public dummy values only; this checker never opens a connection.
+          CSRF_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DATABASE_URL: postgresql://example.invalid/marketpulse
+          DIRECT_DATABASE_URL: postgresql://example.invalid/marketpulse
+          EMAIL_MODE: disabled
+          CRYPTO_DATA_MODE: demo
+          MARKET_WORKER_ENABLED: 'false'
+        run: npm run production:check
       - name: Verify development PostgreSQL
         run: |
           docker compose config --quiet

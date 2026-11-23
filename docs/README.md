@@ -1,15 +1,24 @@
-# MarketPulse — Phase 0
+# MarketPulse documentation
 
-Decision and source verification date: 2026-11-22.
-Status: Phase 0 complete; Phase 1 implementation requires user approval.
+For current setup, supported features, screenshots guidance, and checks, start
+with the [project README](../README.md).
 
-- [Scope and real/demo feature matrix](scope.md)
-- [API comparison and usage budgets](data-providers.md)
-- [Architecture overview](architecture.md)
-- [Deployment requirements](deployment.md)
-- [Technical decisions, open items and acceptance checks](decisions/0001-phase-0-baseline.md)
+## Current operational and feature guides
 
-These documents are the implementation baseline, not an application scaffold.
-No dependencies, accounts, credentials, deployment or application code were created.
-Provider capabilities were researched through public documentation, not credentialed
-API calls. Recheck changing limits and account-specific rights before enabling them.
+- [Production deployment, environment variables, and release verification](deployment.md)
+- [Database schema, migrations, seeding, and isolated integration tests](database.md)
+- [Authentication and account email limitations](authentication.md)
+- [Keyless CoinPaprika integration and data availability](live-crypto.md)
+- [Market backend, worker, and budgets](market-backend.md)
+- [Dashboard and chart behavior](market-ui.md)
+- [Private watchlists](watchlists.md)
+- [Price alerts and target-reached records](alerts.md)
+
+## Historical design and verification
+
+[Scope](scope.md), [provider comparisons](data-providers.md), [architecture](architecture.md),
+and [decision records](decisions/0001-phase-0-baseline.md) contain the original
+phase plans. They may describe future or superseded settings; current source,
+`.env.example` files, and the deployment runbook define the implemented contract.
+Phase verification files in the project root record checks at that stage rather
+than proving a production deployment.

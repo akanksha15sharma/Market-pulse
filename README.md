@@ -1,190 +1,204 @@
-# 📈 MarketPulse
+# MarketPulse
 
-### Full-Stack Cryptocurrency & Stock Market Tracking Platform
+A responsive cryptocurrency and stock market tracker built with React 19, TypeScript,
+Vite, Express 5, Prisma 7, and PostgreSQL 17. Prices are in USD. This is a portfolio
+project, with explicit source, freshness, and simulation labels throughout.
 
-MarketPulse is a full-stack financial market tracking application built with **React, TypeScript, Node.js, Express, and PostgreSQL**. It provides an interactive dashboard for exploring cryptocurrency and stock market data, viewing historical price trends, and organizing favorite assets into personalized watchlists.
+## Features
 
-The project focuses on responsive design, secure authentication, reliable market-data handling, and scalable backend architecture.
+- **Markets:** 10 curated cryptocurrencies and 5 stocks, price cards, search, type
+  filters, and sorting. Star favorites and filter them; favorites stay in this
+  browser through refreshes using localStorage.
+- **Asset details:** catalog information and interactive historical charts with
+  pointer exploration, a keyboard slider, exact-value tables, range statistics,
+  and **24H, 7D, 30D, 1Y** filters.
+- **Private watchlists:** create, rename, and delete up to five account-owned lists,
+  with up to 20 assets each. Saved in PostgreSQL, separate from browser favorites.
+- **Price alerts:** private USD targets, pause/rearm controls, and target-reached
+  history. Only fresh, post-arm real CoinPaprika observations can trigger them.
+  Stock targets remain blocked while stocks are simulated.
+- **Accounts:** registration, sign-in, session revocation, signed CSRF tokens,
+  password hashing, validation, ownership checks, and persistent rate limits.
+- **Reliable data presentation:** cached observations remain visible during refresh
+  failures; loading, pending, stale, unavailable, real, and simulated states are
+  labeled. Keyboard navigation and responsive table scrolling are supported.
 
-## ✨ Features
+CoinPaprika is the active, keyless crypto provider and the default mode. Stocks
+always use simulated data. Historical availability depends on the provider: a
+missing real series stays unavailable, with no simulated replacement. Browser
+prices refresh every 60 seconds while visible; provider refreshes are separately
+budgeted. See [market data](docs/live-crypto.md).
 
-### 📊 Market Dashboard
+Production account email delivery is **not implemented**. Local verification and
+password-reset emails use Mailpit; hosted email must remain disabled. Alerts are
+in-app records, with no production email notifications or continuous-availability
+guarantee. Portfolios and trade execution are not implemented.
 
-- Interactive cryptocurrency and stock market dashboard
-- Asset search, filtering, and sorting
-- Price cards with 24-hour changes
-- Market-data source and freshness indicators
-- Responsive interface with dark-themed styling
+## Project layout
 
-### 📉 Historical Price Charts
+| Location                   | Purpose                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
+| `apps/web`                 | React SPA, market pages, accounts, watchlists, alerts, web tests |
+| `apps/api`                 | Express API, bounded market worker, Prisma schema and migrations |
+| `packages/contracts`       | Shared Zod validation and TypeScript API contracts               |
+| `scripts`                  | Development process supervision and web test runner              |
+| `.github/workflows/ci.yml` | Builds, checks, migrations, seeding, isolated database tests     |
+| `docs`                     | Deployment, database, feature, and architecture documentation    |
 
-- Interactive price history visualizations
-- Multiple supported time ranges
-- Historical data retrieved through backend APIs
-- Clear loading, stale, and unavailable states
+## Local setup
 
-### ⭐ Personalized Watchlists
+Use Node **22.12 or later within Node 22** (`.nvmrc` selects 22), npm 9 or later,
+and Docker with Compose. Run these commands from the project root. If Node is
+managed with nvm, run `nvm use` first.
 
-- Create, rename, and delete watchlists
-- Add and remove cryptocurrency and stock assets
-- View saved assets with their latest available prices
-- PostgreSQL-backed persistence
-- User-specific watchlist access
-
-### 🔐 Authentication & Security
-
-- User registration and login
-- Secure session management
-- Protected application routes
-- CSRF protection
-- Request validation and rate limiting
-- Ownership checks for private resources
-
-### 🌐 Market Data Integration
-
-- CoinGecko integration for cryptocurrency market data
-- Configurable demo and live crypto modes
-- Simulated stock prices for development
-- Server-side caching and provider quota management
-- Explicit real, simulated, stale, and unavailable data labels
-
-**Note:** Live cryptocurrency data requires provider configuration. The application may operate in demo mode, and stock prices are currently simulated.
-
-## 🛠️ Tech Stack
-
-| Category        | Technologies                         |
-| --------------- | ------------------------------------ |
-| Frontend        | React, TypeScript, Vite              |
-| Styling         | Tailwind CSS                         |
-| Backend         | Node.js, Express, TypeScript         |
-| Database        | PostgreSQL                           |
-| ORM             | Prisma                               |
-| Market Data     | CoinGecko API, Demo Provider         |
-| Testing         | Automated unit and integration tests |
-| DevOps          | Docker Compose, GitHub Actions       |
-| Version Control | Git, GitHub                          |
-
-## 🏗️ Architecture
-
-```text
-MarketPulse
-│
-├── Frontend (React + TypeScript)
-│   ├── Market Dashboard
-│   ├── Asset Details
-│   ├── Historical Charts
-│   ├── Watchlists
-│   └── Authentication
-│
-├── Backend (Node.js + Express)
-│   ├── REST API
-│   ├── Authentication & Sessions
-│   ├── Market Data Providers
-│   ├── Cache & Quota Management
-│   └── Watchlist Services
-│
-├── Database (PostgreSQL + Prisma)
-│   ├── Users & Sessions
-│   ├── Assets
-│   ├── Market Data Cache
-│   └── Watchlists
-│
-└── External Market Data APIs
-    └── CoinGecko
+```sh
+npm ci
 ```
 
-## 🚀 Getting Started
+Create environment files only if they do not already exist; preserve existing
+credentials and settings:
 
-### Prerequisites
-
-- Node.js
-- npm
-- Docker and Docker Compose
-- Git
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/akanksha15sharma/Market-pulse.git
-cd Market-pulse
+```sh
+cp -n .env.example .env
+cp -n apps/api/.env.example apps/api/.env
 ```
 
-### 2. Install Dependencies
+The root `.env` configures local Compose credentials and the PostgreSQL port.
+`apps/api/.env` configures the API, Prisma commands, and worker. Workspace scripts
+run in their workspace directory. Match the database credentials and port in both
+files. The browser uses relative `/api/v1` URLs; Vite proxies these to the API in
+development. Use `127.0.0.1` consistently with `APP_ORIGIN` to avoid origin failures.
 
-```bash
-npm install
-```
+Start local dependencies, validate the schema, and initialize your **local** database:
 
-### 3. Configure the Environment
-
-Configure the backend environment variables using the project's example configuration files.
-
-Market-data provider configuration is documented in `docs/live-crypto.md`.
-
-Keep API keys, database credentials, and other secrets outside version control.
-
-### 4. Start Required Services
-
-```bash
-docker compose up -d
-```
-
-### 5. Set Up the Database
-
-Apply the project's Prisma migrations and seed the supported market assets using the repository's database setup scripts.
-
-### 6. Start the Application
-
-```bash
+```sh
+npm run db:up
+npm run db:generate
+npm run db:validate
+npm run db:deploy
+npm run db:status
+npm run db:seed
 npm run dev
 ```
 
-Open the frontend at:
+`db:deploy` applies committed migrations. Seeding upserts the supported catalog;
+it creates no accounts or prices and can be rerun. For creating a new migration
+on a development database, use `npm run db:migrate -w @marketpulse/api -- --name descriptive_change`.
+Never use development migrations or resets against production data.
 
-**http://127.0.0.1:5173**
+- Web: <http://127.0.0.1:5173>
+- API liveness: <http://127.0.0.1:3001/api/v1/health/live>
+- API database readiness: <http://127.0.0.1:3001/api/v1/health/ready>
+- Local Mailpit inbox: <http://127.0.0.1:8025>
 
-Backend API:
+Prices can initially be unavailable until a market request activates the worker
+and a provider fetch completes. Set `CRYPTO_DATA_MODE=demo` for deterministic,
+offline demonstrations. See [environment and deployment settings](docs/deployment.md#environment).
 
-**http://127.0.0.1:3001**
+## Checks and tests
 
-## 🧪 Testing
-
-Run the available project checks:
-
-```bash
-npm test
+```sh
+npm run db:validate
 npm run lint
+npm run format:check
 npm run typecheck
+npm test
 npm run build
 ```
 
-Database integration tests require a configured test PostgreSQL database.
+The default test suite covers configuration/preflight, authentication, market
+providers and caching, favorites, chart behavior, watchlists, and alerts. External
+provider requests are mocked. Typecheck and build regenerate the Prisma client;
+they do not apply migrations or connect to PostgreSQL.
 
-## 🔮 Future Improvements
+Database integration tests are separate. They require an explicitly configured,
+local `marketpulse_test` database with all migrations applied; they refuse other
+hostnames or database names. Follow [database test setup](docs/database.md#database-tests),
+then run:
 
-- Real stock market data integration
-- Configurable price alerts and notifications
-- Portfolio tracking and performance analytics
-- Additional chart indicators
-- Deployment and production monitoring
+```sh
+npm run test:db
+npm run test:auth:db
+npm run test:markets:db
+npm run test:watchlists:db
+npm run test:alerts:db
+```
 
-## 👩‍💻 Author
+CI performs these steps on disposable local PostgreSQL databases, including two
+seed runs. Run `npm audit --omit=dev` when network access is available, and review
+results before changing dependencies. Do not use forced audit upgrades.
 
-**Akanksha Sharma**
+## Production deployment
 
-GitHub: [@akanksha15sharma](https://github.com/akanksha15sharma)
+No deployment is performed by these instructions or the current CI workflow.
+Review the [deployment runbook](docs/deployment.md) before approving a release.
 
-## 📄 Disclaimer
+1. Provide a PostgreSQL database, TLS, secrets, backups, and an HTTPS frontend
+   origin. Set production variables in the host's secret store; keep secrets out
+   of `VITE_*` variables and static artifacts.
+2. Build with the full development toolchain available:
 
-MarketPulse is an educational and portfolio project. Market data may be delayed, cached, unavailable, or simulated depending on provider configuration.
+   ```sh
+   npm ci --include=dev
+   npm run build
+   npm run production:check
+   ```
 
-The application does not provide investment advice or execute financial transactions.
+   `production:check` requires `NODE_ENV=production`, the exact HTTPS `APP_ORIGIN`,
+   a stable `CSRF_SECRET`, and valid PostgreSQL URLs. It validates configuration
+   only: it makes no database or provider requests and performs no deployment.
 
-## Phase 7 — price alerts
+3. After release approval and a verified backup, run the database release job once:
 
-Signed-in users can manage private USD price targets and target-reached history at
-`/alerts`. This phase follows the explicit request to build alerts before portfolios.
-Only fresh, post-arm real CoinPaprika quotes can trigger an alert. Stock targets
-remain saved but blocked while stocks use simulated data. Apply the additive event
-provenance migration before running the feature. See [setup and semantics](docs/alerts.md)
-and [verification results](PHASE7-VERIFICATION.md). Work stops before Phase 8.
+   ```sh
+   npm run db:deploy
+   npm run db:status
+   npm run db:seed
+   ```
+
+4. Serve `apps/web/dist` from a static host/reverse proxy with SPA fallback, and
+   route `/api/*` on the **same public origin** to the API. Start the compiled API
+   with `npm start`, which runs the production preflight first. Set `HOST=0.0.0.0`
+   only when the hosting/container network requires it.
+5. Verify readiness, deep links, account sessions, favorites, watchlists, and real
+   and simulated data labels before admitting traffic. Enable a standalone worker
+   with `npm run start:worker` only on an explicitly configured always-on service.
+
+The API does not serve the React build. `vite preview` is a local preview tool,
+not a production server. Sleeping services can miss alert crossings; the application
+does not reconstruct observations from downtime. Public account launches need a
+separate decision on the missing production recovery-email capability.
+
+## Screenshots
+
+No screenshots are bundled yet. Capture them from your running checkout with
+synthetic accounts and `CRYPTO_DATA_MODE=demo`, leaving simulated labels visible.
+Suggested captures:
+
+| Suggested file under `docs/screenshots/` | Capture                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `markets-desktop.png`                    | Dashboard, source labels, and starred assets                     |
+| `asset-details.png`                      | Chart, time filters, selected observation, and asset information |
+| `watchlists.png`                         | A synthetic user's list with cached prices                       |
+| `alerts.png`                             | A synthetic target and its eligibility/source explanation        |
+| `markets-mobile.png`                     | A narrow viewport with wrapped navigation and table scrolling    |
+
+Create that directory when adding real captures. Use descriptive alt text and
+relative Markdown links once files exist. Record the viewport and data mode in
+the caption. Hide real names, emails, passwords, tokens, connection strings, and
+browser developer tools. Never remove provenance labels to imply demo data is live.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md), [deployment runbook](docs/deployment.md),
+[database guide](docs/database.md), [authentication](docs/authentication.md),
+[watchlists](docs/watchlists.md), and [alerts](docs/alerts.md). Older phase documents
+record historical decisions and verification; current source and the runbook define
+the implemented environment contract.
+
+## Author and disclaimer
+
+Akanksha Sharma — [GitHub](https://github.com/akanksha15sharma).
+
+MarketPulse is an educational portfolio project. Market data can be delayed,
+unavailable, cached, or simulated. It does not provide investment advice or execute trades.
