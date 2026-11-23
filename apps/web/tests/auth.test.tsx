@@ -1,3 +1,4 @@
+import { AppLayout } from '../src/layouts/AppLayout';
 import { api, ApiError } from '../src/lib/api-client';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -143,4 +144,15 @@ test('API client sends valid secured mutations and reports network failures', as
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('skip link points to a focusable main landmark', () => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <AppLayout />
+    </MemoryRouter>,
+  );
+  assert.match(html, /href="#main"/);
+  assert.match(html, /<main id="main" tabindex="-1"/);
+  assert.match(html, /aria-label="Main navigation"/);
 });

@@ -210,6 +210,10 @@ test('saved assets show cache provenance and simulated labels; inactive assets r
   assert.match(active, /\$120\.25/);
   assert.match(active, /-1.50%/);
   assert.match(active, /Simulated data/);
+  assert.match(
+    active,
+    /role="region" aria-label="Saved asset prices" tabindex="0"/,
+  );
   assert.match(active, /DEMO/);
   assert.match(active, /Remove Apple/);
   assert.match(active, new RegExp(`/assets/${assetId}`));

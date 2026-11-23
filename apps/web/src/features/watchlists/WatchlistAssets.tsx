@@ -29,7 +29,12 @@ export function WatchlistAssets({
       </div>
     );
   return (
-    <div className="market-table-scroll">
+    <div
+      className="market-table-scroll"
+      role="region"
+      aria-label="Saved asset prices"
+      tabIndex={0}
+    >
       <table className="market-table">
         <caption className="sr-only">
           Saved assets with current cached USD prices

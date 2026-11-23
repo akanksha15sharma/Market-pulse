@@ -223,7 +223,12 @@ export function HistoryChart({
       )}
       <details className="chart-data">
         <summary>View {points.length} observations as a table</summary>
-        <div className="chart-data-scroll">
+        <div
+          className="chart-data-scroll"
+          role="region"
+          aria-label={`${name} historical observations`}
+          tabIndex={0}
+        >
           <table>
             <caption className="sr-only">{name} history in USD</caption>
             <thead>

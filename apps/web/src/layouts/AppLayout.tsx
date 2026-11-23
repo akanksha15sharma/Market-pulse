@@ -51,7 +51,7 @@ export function AppLayout() {
           </div>
         </nav>
       </header>
-      <main id="main" className="mx-auto max-w-6xl px-6 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-6 py-10">
         <Outlet />
       </main>
       <footer className="mx-auto max-w-6xl px-6 py-8 text-sm text-slate-400">

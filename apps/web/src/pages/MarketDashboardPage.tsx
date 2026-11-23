@@ -156,7 +156,12 @@ export function MarketDashboardPage() {
               {query ? ` matching “${query}”` : ''}
             </p>
             {assets.length ? (
-              <div className="market-table-scroll">
+              <div
+                className="market-table-scroll"
+                role="region"
+                aria-label="Market prices"
+                tabIndex={0}
+              >
                 <table className="market-table">
                   <caption className="sr-only">
                     Market prices in USD. Select an asset to explore price

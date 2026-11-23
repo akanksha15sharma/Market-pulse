@@ -176,6 +176,10 @@ test('flat historical series renders finite geometry, keyboard exploration and e
   assert.match(html, /Simulated data/);
   assert.match(html, /DEMO/);
   assert.match(html, /View 2 observations/);
+  assert.match(
+    html,
+    /role="region" aria-label="Apple historical observations" tabindex="0"/,
+  );
   const pending = renderToStaticMarkup(
     <HistoryChart
       history={{
