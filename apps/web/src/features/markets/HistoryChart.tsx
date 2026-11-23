@@ -2,6 +2,9 @@ import { useId, useState } from 'react';
 import type { History } from './api';
 import {
   chartPoints,
+  change,
+  historySummary,
+  nearestObservation,
   money,
   observed,
   historyStatus,
@@ -48,6 +51,7 @@ export function HistoryChart({
     points.length - 1,
   );
   const current = points[currentIndex]!;
+  const summary = historySummary(points)!;
   const minimum = Math.min(...points.map((point) => point.value));
   const maximum = Math.max(...points.map((point) => point.value));
   const padding = (maximum - minimum) * 0.12 || maximum * 0.01;
@@ -86,14 +90,7 @@ export function HistoryChart({
           const time =
             first +
             Math.max(0, Math.min(1, (position - 70) / 850)) * (last - first);
-          let index = 0;
-          points.forEach((point, candidate) => {
-            if (
-              Math.abs(point.time - time) < Math.abs(points[index]!.time - time)
-            )
-              index = candidate;
-          });
-          setSelected(index);
+          setSelected(nearestObservation(points, time));
         }}
       >
         <title
@@ -166,6 +163,26 @@ export function HistoryChart({
           {new Date(last).toLocaleDateString()}
         </text>
       </svg>
+      <dl className="history-summary">
+        <div>
+          <dt>Range low</dt>
+          <dd>{money(String(summary.low))}</dd>
+        </div>
+        <div>
+          <dt>Range high</dt>
+          <dd>{money(String(summary.high))}</dd>
+        </div>
+        <div>
+          <dt>Range change</dt>
+          <dd className={summary.changePercent < 0 ? 'negative' : 'positive'}>
+            {change(String(summary.changePercent))}
+          </dd>
+        </div>
+      </dl>
+      <p className="quote-notice">
+        Range statistics use the available observations. Coverage may be shorter
+        than the selected range.
+      </p>
       <label className="chart-slider-label">
         Explore observations
         <input

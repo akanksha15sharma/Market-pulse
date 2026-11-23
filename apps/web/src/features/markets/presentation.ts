@@ -1,6 +1,7 @@
 import {
   historySourceMaxAge,
   type MarketAsset,
+  type HistoryRange,
   type QuoteDto,
 } from '@marketpulse/contracts';
 import type { History } from './api';
@@ -126,3 +127,31 @@ export function historyStatus(history: History, now = Date.now()) {
     return 'stale';
   return 'fresh';
 }
+
+export function nearestObservation(points: { time: number }[], time: number) {
+  if (!points.length) return null;
+  let index = 0;
+  points.forEach((point, candidate) => {
+    if (Math.abs(point.time - time) < Math.abs(points[index]!.time - time))
+      index = candidate;
+  });
+  return index;
+}
+
+export function historySummary(points: { value: number }[]) {
+  if (!points.length) return null;
+  const first = points[0]!.value;
+  const last = points.at(-1)!.value;
+  return {
+    low: Math.min(...points.map((point) => point.value)),
+    high: Math.max(...points.map((point) => point.value)),
+    changePercent: ((last - first) / first) * 100,
+  };
+}
+
+export const historyRanges: { value: HistoryRange; label: string }[] = [
+  { value: '1D', label: '24H' },
+  { value: '7D', label: '7D' },
+  { value: '1M', label: '30D' },
+  { value: '1Y', label: '1Y' },
+];

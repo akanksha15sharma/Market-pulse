@@ -1,12 +1,16 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { z } from 'zod';
-import { historyRangeSchema, type HistoryRange } from '@marketpulse/contracts';
+import { type HistoryRange } from '@marketpulse/contracts';
 import {
   historyInterval,
   loadAsset,
   loadHistory,
 } from '../features/markets/api';
+import {
+  AssetInformation,
+  HistoryRangeFilters,
+} from '../features/markets/AssetInformation';
 import { useMarketResource } from '../features/markets/use-market-resource';
 const HistoryChart = lazy(() =>
   import('../features/markets/HistoryChart').then((module) => ({
@@ -112,21 +116,7 @@ function AssetDetail({ id }: { id: string }) {
                 <h2 id="history-heading">Price history</h2>
                 <p>Explore observations, one point at a time.</p>
               </div>
-              <div
-                className="market-tabs range-tabs"
-                role="group"
-                aria-label="Historical range"
-              >
-                {historyRangeSchema.options.map((value) => (
-                  <button
-                    key={value}
-                    aria-pressed={range === value}
-                    onClick={() => setRange(value)}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
+              <HistoryRangeFilters range={range} onChange={setRange} />
             </div>
             <AssetHistory
               key={`${range}:${asset.data.quote?.provider}`}
@@ -136,6 +126,7 @@ function AssetDetail({ id }: { id: string }) {
               name={asset.data.asset.name}
             />
           </section>
+          <AssetInformation asset={asset.data.asset} />
           <MarketSourcePolicy status={asset.data.status} />
         </>
       )}

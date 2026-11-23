@@ -1,3 +1,12 @@
+import {
+  AssetInformation,
+  HistoryRangeFilters,
+} from '../src/features/markets/AssetInformation';
+import {
+  historyRanges,
+  historySummary,
+  nearestObservation,
+} from '../src/features/markets/presentation';
 import { FavoriteButton } from '../src/features/markets/FavoriteButton';
 import {
   favoritesStorageKey,
@@ -640,4 +649,105 @@ test('favorite stars expose an accessible action and pressed state', () => {
     assert.match(html, /type="button"/);
     assert.match(html, selected ? /★/ : /☆/);
   }
+});
+
+test('detail range filters show requested labels mapped to supported API ranges', () => {
+  assert.deepEqual(historyRanges, [
+    { value: '1D', label: '24H' },
+    { value: '7D', label: '7D' },
+    { value: '1M', label: '30D' },
+    { value: '1Y', label: '1Y' },
+  ]);
+  for (const range of historyRanges) {
+    const html = renderToStaticMarkup(
+      <HistoryRangeFilters range={range.value} onChange={() => {}} />,
+    );
+    assert.match(html, /aria-label="Historical range"/);
+    assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 1);
+    assert.match(
+      html,
+      new RegExp(`aria-pressed="true">${range.label}</button>`),
+    );
+  }
+});
+
+test('asset information shows catalog facts and clearly identifies simulated stocks', () => {
+  const html = renderToStaticMarkup(<AssetInformation asset={stock} />);
+  for (const value of [
+    'About Apple',
+    'AAPL',
+    'Stock',
+    'NASDAQ',
+    'USD',
+    'Simulated data only',
+  ]) {
+    assert.ok(html.includes(value));
+  }
+  const real = renderToStaticMarkup(<AssetInformation asset={crypto} />);
+  assert.match(real, /Crypto market/);
+  assert.match(real, /Real data where available/);
+  assert.doesNotMatch(real, /Simulated data only/);
+});
+
+test('chart pointer selection uses observation times including irregular samples and endpoints', () => {
+  const points = [{ time: 0 }, { time: 10 }, { time: 1000 }];
+  assert.equal(nearestObservation([], 5), null);
+  assert.equal(nearestObservation(points, -20), 0);
+  assert.equal(nearestObservation(points, 15), 1);
+  assert.equal(nearestObservation(points, 700), 2);
+  assert.equal(nearestObservation(points, 2000), 2);
+  assert.equal(nearestObservation([{ time: 1 }], 10), 0);
+});
+
+test('range summaries calculate observed low, high, and change without inventing missing samples', () => {
+  assert.equal(historySummary([]), null);
+  assert.deepEqual(
+    historySummary([{ value: 100 }, { value: 80 }, { value: 120 }]),
+    {
+      low: 80,
+      high: 120,
+      changePercent: 20,
+    },
+  );
+  assert.deepEqual(historySummary([{ value: 100 }, { value: 75 }]), {
+    low: 75,
+    high: 100,
+    changePercent: -25,
+  });
+  assert.deepEqual(historySummary([{ value: 10 }]), {
+    low: 10,
+    high: 10,
+    changePercent: 0,
+  });
+});
+
+test('real historical charts retain source attribution, interactive controls, and range statistics', () => {
+  const now = Date.now();
+  const html = renderToStaticMarkup(
+    <HistoryChart
+      name="Bitcoin"
+      history={{
+        ...history,
+        assetId: crypto.id,
+        provider: 'COINPAPRIKA',
+        mode: 'REAL',
+        simulated: false,
+        range: '7D',
+        points: [
+          { timestamp: new Date(now - 86400_000).toISOString(), price: '100' },
+          { timestamp: new Date(now).toISOString(), price: '120' },
+        ],
+      }}
+    />,
+  );
+  assert.match(html, /Real market data/);
+  assert.match(html, /COINPAPRIKA/);
+  assert.match(html, /coinpaprika.com/);
+  assert.match(html, /Range low/);
+  assert.match(html, /Range high/);
+  assert.match(html, /\+20.00%/);
+  assert.match(html, /type="range"/);
+  assert.match(html, /aria-valuetext=/);
+  assert.match(html, /Coverage may be shorter/);
+  assert.doesNotMatch(html, /Simulated data/);
 });
