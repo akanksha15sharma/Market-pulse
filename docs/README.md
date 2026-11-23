@@ -5,6 +5,8 @@ with the [project README](../README.md).
 
 ## Current operational and feature guides
 
+- [Free hosting comparison, provider limits, and opt-in background alerts](free-deployment.md)
+
 - [Production deployment, environment variables, and release verification](deployment.md)
 - [Database schema, migrations, seeding, and isolated integration tests](database.md)
 - [Authentication and account email limitations](authentication.md)

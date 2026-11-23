@@ -5,6 +5,10 @@ No hosting resources have been provisioned, migrations applied, or deployment
 performed during production preparation. Hosting-specific values must be selected
 before release; no free-tier capacity, pricing, or continuous service is assumed.
 
+For a researched Vercel/Render/Neon personal-demo profile and optional bounded
+background batches, see the [free deployment plan](free-deployment.md). That plan
+preserves the existing continuous worker for other hosting choices.
+
 ## Topology
 
 Use one public HTTPS origin with two upstreams:

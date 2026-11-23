@@ -131,7 +131,10 @@ results before changing dependencies. Do not use forced audit upgrades.
 ## Production deployment
 
 No deployment is performed by these instructions or the current CI workflow.
-Review the [deployment runbook](docs/deployment.md) before approving a release.
+Review the [deployment runbook](docs/deployment.md) and the researched
+[$0 hosting plan](docs/free-deployment.md) before approving a release. The free
+profile uses Vercel, Render, Neon, and an optional, disabled-by-default background
+batch; it preserves features but cannot promise immediate or continuous alerts.
 
 1. Provide a PostgreSQL database, TLS, secrets, backups, and an HTTPS frontend
    origin. Set production variables in the host's secret store; keep secrets out
