@@ -128,14 +128,32 @@ export function historyStatus(history: History, now = Date.now()) {
   return 'fresh';
 }
 
-export function nearestObservation(points: { time: number }[], time: number) {
+// chartPoints supplies observations sorted by time. Ties keep the first sample.
+export function nearestObservation(
+  points: readonly { time: number }[],
+  time: number,
+) {
   if (!points.length) return null;
-  let index = 0;
-  points.forEach((point, candidate) => {
-    if (Math.abs(point.time - time) < Math.abs(points[index]!.time - time))
-      index = candidate;
-  });
-  return index;
+  function lowerBound(target: number) {
+    let low = 0;
+    let high = points.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (points[middle]!.time < target) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+  const right = lowerBound(time);
+  const index =
+    right === 0
+      ? 0
+      : right === points.length
+        ? right - 1
+        : time - points[right - 1]!.time <= points[right]!.time - time
+          ? right - 1
+          : right;
+  return lowerBound(points[index]!.time);
 }
 
 export function historySummary(points: { value: number }[]) {

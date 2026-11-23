@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { memo, useId, useMemo, useState } from 'react';
 import type { History } from './api';
 import {
   chartPoints,
@@ -22,12 +22,33 @@ export function HistoryChart({
   const title = useId();
   const gradient = useId();
   const state = historyStatus(history);
-  const points = state === 'unavailable' ? [] : chartPoints(history);
+  const points = useMemo(() => chartPoints(history), [history]);
+  const geometry = useMemo(() => {
+    if (!points.length) return null;
+    const summary = historySummary(points)!;
+    const minimum = summary.low;
+    const maximum = summary.high;
+    const padding = (maximum - minimum) * 0.12 || maximum * 0.01;
+    const low = minimum - padding;
+    const high = maximum + padding;
+    const first = points[0]!.time;
+    const last = points[points.length - 1]!.time;
+    const x = (time: number) =>
+      70 + ((time - first) / (last - first || 1)) * 850;
+    const y = (value: number) => 30 + ((high - value) / (high - low)) * 230;
+    const path = points
+      .map(
+        (point, index) =>
+          `${index ? 'L' : 'M'}${x(point.time)},${y(point.value)}`,
+      )
+      .join(' ');
+    return { summary, low, high, first, last, x, y, path };
+  }, [points]);
   const [selected, setSelected] = useState<number | null>(null);
   const waiting =
     history.refresh === 'pending' &&
     (!history.reason || ['pending', 'busy'].includes(history.reason));
-  if (!points.length)
+  if (state === 'unavailable' || !geometry)
     return (
       <div className="chart-empty" role="status">
         <DataLabel simulated={history.simulated} />
@@ -51,22 +72,8 @@ export function HistoryChart({
     points.length - 1,
   );
   const current = points[currentIndex]!;
-  const summary = historySummary(points)!;
-  const minimum = Math.min(...points.map((point) => point.value));
-  const maximum = Math.max(...points.map((point) => point.value));
-  const padding = (maximum - minimum) * 0.12 || maximum * 0.01;
-  const low = minimum - padding;
-  const high = maximum + padding;
-  const first = points[0]!.time;
-  const last = points[points.length - 1]!.time;
-  const x = (time: number) => 70 + ((time - first) / (last - first || 1)) * 850;
-  const y = (value: number) => 30 + ((high - value) / (high - low)) * 230;
-  const path = points
-    .map(
-      (point, index) =>
-        `${index ? 'L' : 'M'}${x(point.time)},${y(point.value)}`,
-    )
-    .join(' ');
+  const { summary, low, high, first, last, x, y, path } = geometry;
+
   return (
     <figure className="history-figure">
       <div className="chart-observation">
@@ -86,6 +93,7 @@ export function HistoryChart({
         aria-labelledby={title}
         onPointerMove={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
+          if (!rect.width) return;
           const position = ((event.clientX - rect.left) / rect.width) * 950;
           const time =
             first +
@@ -221,37 +229,49 @@ export function HistoryChart({
           .
         </p>
       )}
-      <details className="chart-data">
-        <summary>View {points.length} observations as a table</summary>
-        <div
-          className="chart-data-scroll"
-          role="region"
-          aria-label={`${name} historical observations`}
-          tabIndex={0}
-        >
-          <table>
-            <caption className="sr-only">{name} history in USD</caption>
-            <thead>
-              <tr>
-                <th scope="col">Observation time</th>
-                <th scope="col">Price (USD)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {points.map((point, index) => (
-                <tr key={`${point.timestamp}-${index}`}>
-                  <td>
-                    <time dateTime={point.timestamp}>
-                      {observed(point.timestamp)}
-                    </time>
-                  </td>
-                  <td>{point.price}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      <HistoryDataTable points={points} name={name} />
     </figure>
   );
 }
+
+const HistoryDataTable = memo(function HistoryDataTable({
+  points,
+  name,
+}: {
+  points: ReturnType<typeof chartPoints>;
+  name: string;
+}) {
+  return (
+    <details className="chart-data">
+      <summary>View {points.length} observations as a table</summary>
+      <div
+        className="chart-data-scroll"
+        role="region"
+        aria-label={`${name} historical observations`}
+        tabIndex={0}
+      >
+        <table>
+          <caption className="sr-only">{name} history in USD</caption>
+          <thead>
+            <tr>
+              <th scope="col">Observation time</th>
+              <th scope="col">Price (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {points.map((point, index) => (
+              <tr key={`${point.timestamp}-${index}`}>
+                <td>
+                  <time dateTime={point.timestamp}>
+                    {observed(point.timestamp)}
+                  </time>
+                </td>
+                <td>{point.price}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+});

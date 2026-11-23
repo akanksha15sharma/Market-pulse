@@ -867,3 +867,19 @@ test('loading status distinguishes first load from a refresh with cached observa
   assert.match(refreshing, /Refreshing cached observations/);
   assert.match(refreshing, /aria-hidden="true"/);
 });
+
+test('chart selection stays bounded for large histories and preserves earliest ties', () => {
+  let reads = 0;
+  const points = Array.from({ length: 5000 }, (_, index) => ({
+    get time() {
+      reads++;
+      return index * 100;
+    },
+  }));
+  assert.equal(nearestObservation(points, 345_640), 3456);
+  assert.ok(reads < 40, `Expected logarithmic lookup; read ${reads} samples`);
+  const duplicates = [{ time: 0 }, { time: 10 }, { time: 10 }, { time: 20 }];
+  assert.equal(nearestObservation(duplicates, 10), 1);
+  assert.equal(nearestObservation(duplicates, 15), 1);
+  assert.equal(nearestObservation(duplicates, 100), 3);
+});
