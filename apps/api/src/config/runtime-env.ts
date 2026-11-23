@@ -80,3 +80,28 @@ export function parseRuntimeEnv(input: Record<string, string | undefined>) {
 
   return parsed;
 }
+
+export function validateProductionEnv(
+  input: Record<string, string | undefined>,
+) {
+  const parsed = parseRuntimeEnv(input);
+  if (parsed.NODE_ENV !== 'production')
+    throw new Error('NODE_ENV must be production');
+  for (const name of ['DATABASE_URL', 'DIRECT_DATABASE_URL'] as const) {
+    const value = input[name];
+    if (name === 'DIRECT_DATABASE_URL' && value === undefined) continue;
+    let url: URL;
+    try {
+      url = new URL(value ?? '');
+    } catch {
+      throw new Error(`${name} must be a PostgreSQL connection URL`);
+    }
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      !url.hostname ||
+      url.pathname.length < 2
+    )
+      throw new Error(`${name} must name a PostgreSQL host and database`);
+  }
+  return parsed;
+}

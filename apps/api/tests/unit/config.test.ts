@@ -1,6 +1,10 @@
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseRuntimeEnv } from '../../src/config/runtime-env.js';
+import {
+  parseRuntimeEnv,
+  validateProductionEnv,
+} from '../../src/config/runtime-env.js';
 
 const production = {
   NODE_ENV: 'production',
@@ -61,4 +65,74 @@ test('development remains usable with loopback Mailpit and validates ports and o
     { EMAIL_MODE: 'mailpit', MAILPIT_URL: 'https://external.example' },
   ])
     assert.throws(() => parseRuntimeEnv(input));
+});
+
+test('production preflight validates database URLs without connecting or leaking credentials', () => {
+  const input = {
+    ...production,
+    DATABASE_URL:
+      'postgresql://user:private-secret@db.invalid/marketpulse?sslmode=verify-full',
+  };
+  assert.equal(validateProductionEnv(input).NODE_ENV, 'production');
+  assert.doesNotThrow(() =>
+    validateProductionEnv({
+      ...input,
+      DIRECT_DATABASE_URL: 'postgres://db.invalid/marketpulse',
+    }),
+  );
+  for (const invalid of [
+    { ...input, NODE_ENV: 'development' },
+    { ...input, DATABASE_URL: undefined },
+    {
+      ...input,
+      DATABASE_URL: 'mysql://user:private-secret@db.invalid/marketpulse',
+    },
+    { ...input, DATABASE_URL: 'postgresql://db.invalid/' },
+    { ...input, DIRECT_DATABASE_URL: '' },
+  ]) {
+    assert.throws(
+      () => validateProductionEnv(invalid),
+      (error: unknown) =>
+        error instanceof Error && !error.message.includes('private-secret'),
+    );
+  }
+});
+
+test('production preflight CLI exits safely for valid and invalid configuration', () => {
+  const input = {
+    ...production,
+    DATABASE_URL: 'postgresql://user:private-secret@db.invalid/marketpulse',
+    DIRECT_DATABASE_URL:
+      'postgresql://user:private-secret@db.invalid/marketpulse',
+    EMAIL_MODE: 'disabled',
+    CRYPTO_DATA_MODE: 'demo',
+    STOCK_DATA_MODE: 'demo',
+    TRUSTED_PROXIES: '',
+  };
+  for (const [overrides, expected] of [
+    [{}, 0],
+    [{ CSRF_SECRET: 'private-short-secret' }, 1],
+    [{ DATABASE_URL: '' }, 1],
+    [{ CRYPTO_DATA_MODE: 'unknown' }, 1],
+  ] as const) {
+    const result = spawnSync(
+      process.execPath,
+      ['--import', 'tsx', 'src/tools/check-production.ts'],
+      {
+        env: { ...process.env, ...input, ...overrides },
+        encoding: 'utf8',
+        timeout: 15_000,
+      },
+    );
+    assert.equal(result.status, expected, result.stderr);
+    const output = result.stdout + result.stderr;
+    assert.doesNotMatch(
+      output,
+      /private-secret|private-short-secret|db.invalid/,
+    );
+    assert.match(
+      output,
+      expected === 0 ? /No database connection/ : /configuration is invalid/,
+    );
+  }
 });
