@@ -1001,3 +1001,27 @@
     flex-wrap: wrap;
   }
 }
+
+.favorite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid #304055;
+  border-radius: 0.65rem;
+  background: #111f31;
+  color: #94a3b8;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.favorite-button:hover,
+.favorite-button[aria-pressed='true'] {
+  color: #6ee7b7;
+  background: #173c36;
+  border-color: #397368;
+}
+.favorite-button:focus-visible {
+  outline: 2px solid #6ee7b7;
+  outline-offset: 3px;
+}

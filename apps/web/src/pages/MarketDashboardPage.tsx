@@ -1,4 +1,6 @@
 import { Link, useSearchParams } from 'react-router';
+import { FavoriteButton } from '../features/markets/FavoriteButton';
+import { useFavorites } from '../features/markets/favorites';
 import { loadOverview } from '../features/markets/api';
 import { useMarketResource } from '../features/markets/use-market-resource';
 import {
@@ -21,6 +23,8 @@ export function MarketDashboardPage() {
   const { data, error, loading, retry, checkedAt } =
     useMarketResource(loadOverview);
   const [params, setParams] = useSearchParams();
+  const { favorites, toggle } = useFavorites();
+  const favoritesOnly = params.get('favorites') === 'true';
   const query = params.get('q') ?? '';
   const type = ['CRYPTO', 'STOCK'].includes(params.get('type') ?? '')
     ? params.get('type')!
@@ -36,7 +40,13 @@ export function MarketDashboardPage() {
       },
       { replace: true },
     );
-  const assets = filterAssets(data?.assets ?? [], query, type, sort);
+  const assets = filterAssets(
+    data?.assets ?? [],
+    query,
+    type,
+    sort,
+    favoritesOnly ? favorites : undefined,
+  );
   const featured =
     data?.assets.filter((asset) =>
       ['BTC', 'ETH', 'SOL', 'AAPL'].includes(asset.symbol),
@@ -108,6 +118,16 @@ export function MarketDashboardPage() {
                   </button>
                 ))}
               </div>
+              <div className="market-tabs">
+                <button
+                  aria-pressed={favoritesOnly}
+                  onClick={() =>
+                    update('favorites', favoritesOnly ? '' : 'true')
+                  }
+                >
+                  Favorites
+                </button>
+              </div>
               <label className="search-label">
                 <span className="sr-only">
                   Search catalog by name or symbol
@@ -144,6 +164,9 @@ export function MarketDashboardPage() {
                   </caption>
                   <thead>
                     <tr>
+                      <th scope="col">
+                        <span className="sr-only">Favorite</span>
+                      </th>
                       <th scope="col">Asset</th>
                       <th scope="col">Price</th>
                       <th scope="col">24h change</th>
@@ -159,6 +182,13 @@ export function MarketDashboardPage() {
                       const state = quoteStatus(quote);
                       return (
                         <tr key={asset.id}>
+                          <td>
+                            <FavoriteButton
+                              name={asset.name}
+                              selected={favorites.includes(asset.key)}
+                              onToggle={() => toggle(asset.key)}
+                            />
+                          </td>
                           <th scope="row">
                             <Link
                               className="asset-link"
@@ -213,10 +243,15 @@ export function MarketDashboardPage() {
               </div>
             ) : (
               <div className="catalog-empty">
-                <h3>No matching assets</h3>
+                <h3>
+                  {favoritesOnly
+                    ? 'No matching favorites'
+                    : 'No matching assets'}
+                </h3>
                 <p>
-                  Search the curated catalog by name or symbol, or choose
-                  another asset type.
+                  {favoritesOnly
+                    ? 'Star assets in All assets to build your favorites, or clear filters to explore the catalog.'
+                    : 'Search the curated catalog by name or symbol, or choose another asset type.'}
                 </p>
                 <button
                   className="secondary-button"

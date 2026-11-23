@@ -50,11 +50,13 @@ export function filterAssets(
   query: string,
   type: string,
   sort: string,
+  favorites?: readonly string[],
 ) {
   const text = query.trim().toLowerCase();
   return assets
     .filter(
       (asset) =>
+        (!favorites || favorites.includes(asset.key)) &&
         (type === 'ALL' || asset.type === type) &&
         `${asset.symbol} ${asset.name}`.toLowerCase().includes(text),
     )

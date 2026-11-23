@@ -1,3 +1,10 @@
+import { FavoriteButton } from '../src/features/markets/FavoriteButton';
+import {
+  favoritesStorageKey,
+  readFavorites,
+  writeFavorites,
+  toggleFavorite,
+} from '../src/features/markets/favorites';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { setImmediate as nextTurn } from 'node:timers/promises';
@@ -540,5 +547,97 @@ test('429 honors numeric/date Retry-After and blocks manual retries during coold
     assert.equal(calls, before);
   } finally {
     globalThis.fetch = original;
+  }
+});
+
+test('favorites can be starred, restored after refresh, and unstarred without changing other selections', () => {
+  let saved: string | null = null;
+  const storage = {
+    getItem: (key: string) => {
+      assert.equal(key, favoritesStorageKey);
+      return saved;
+    },
+    setItem: (key: string, value: string) => {
+      assert.equal(key, favoritesStorageKey);
+      saved = value;
+    },
+  };
+  const original: string[] = [];
+  const starred = toggleFavorite(
+    toggleFavorite(original, stock.key),
+    crypto.key,
+  );
+  assert.deepEqual(original, []);
+  writeFavorites(storage, starred);
+  const restored = readFavorites(storage);
+  assert.deepEqual(restored, [stock.key, crypto.key]);
+  writeFavorites(storage, toggleFavorite(restored, stock.key));
+  assert.deepEqual(readFavorites(storage), [crypto.key]);
+  writeFavorites(storage, toggleFavorite(readFavorites(storage), crypto.key));
+  assert.deepEqual(readFavorites(storage), []);
+});
+
+test('favorites safely handle missing, malformed, and blocked storage', () => {
+  for (const value of [null, '{', '{}', 'null', '123']) {
+    assert.deepEqual(
+      readFavorites({ getItem: () => value, setItem: () => {} }),
+      [],
+    );
+  }
+  assert.deepEqual(
+    readFavorites({
+      getItem: () => '["stock:aapl",null,4,"","stock:aapl"]',
+      setItem: () => {},
+    }),
+    [stock.key],
+  );
+  const blocked = {
+    getItem: (): string | null => {
+      throw new Error('blocked');
+    },
+    setItem: () => {
+      throw new Error('quota');
+    },
+  };
+  assert.deepEqual(readFavorites(blocked), []);
+  assert.doesNotThrow(() => writeFavorites(blocked, [stock.key]));
+});
+
+test('favorites filter combines with search, type, and sorting', () => {
+  const assets = [crypto, stock];
+  assert.deepEqual(filterAssets(assets, '', 'ALL', 'name', [stock.key]), [
+    stock,
+  ]);
+  assert.deepEqual(
+    filterAssets(assets, ' APP ', 'STOCK', 'symbol', [stock.key]),
+    [stock],
+  );
+  assert.deepEqual(
+    filterAssets(assets, 'btc', 'ALL', 'symbol', [stock.key]),
+    [],
+  );
+  assert.deepEqual(filterAssets(assets, '', 'CRYPTO', 'name', [stock.key]), []);
+  assert.deepEqual(filterAssets(assets, '', 'ALL', 'name', []), []);
+  assert.deepEqual(
+    filterAssets(assets, '', 'ALL', 'name', [crypto.key, stock.key]),
+    [stock, crypto],
+  );
+  assert.deepEqual(assets, [crypto, stock]);
+});
+
+test('favorite stars expose an accessible action and pressed state', () => {
+  for (const selected of [false, true]) {
+    const html = renderToStaticMarkup(
+      <FavoriteButton name="Apple" selected={selected} onToggle={() => {}} />,
+    );
+    assert.match(html, new RegExp(`aria-pressed="${selected}"`));
+    assert.match(
+      html,
+      new RegExp(
+        selected ? 'Remove Apple from favorites' : 'Add Apple to favorites',
+      ),
+    );
+    assert.match(html, /type="button"/);
+    assert.match(html, selected ? /★/ : /☆/);
   }
 });
