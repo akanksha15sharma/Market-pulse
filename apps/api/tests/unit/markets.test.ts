@@ -463,6 +463,71 @@ test('REST validates filters/ranges/IDs, hides provider mappings and returns exp
   assert.ok(!JSON.stringify(status.body).includes('synthetic-secret'));
 });
 
+test('catalog paths select the collection route and validate queries independently of proxy headers', async () => {
+  const fixture = memoryStore();
+  const market = createMarketService(fixture.store, demo);
+  const queries: unknown[] = [];
+  let detailCalls = 0;
+  const app = createApp(
+    { limit: async () => {} } as unknown as AuthService,
+    {
+      origin: 'https://market-pulse-five-sand.vercel.app',
+      secret: 'a'.repeat(64),
+      secure: true,
+      ttlSeconds: 3600,
+    },
+    {
+      ...market,
+      async list(query) {
+        queries.push(query);
+        return market.list(query);
+      },
+      async detail(id) {
+        detailCalls++;
+        return market.detail(id);
+      },
+    },
+  );
+  const browser = {
+    'sec-fetch-site': 'cross-site',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-dest': 'document',
+    'x-forwarded-host': 'market-pulse-five-sand.vercel.app',
+    'x-forwarded-proto': 'https',
+  };
+  for (const headers of [{}, browser] as Record<string, string>[]) {
+    for (const [path, limit] of [
+      ['/api/v1/assets', 20],
+      ['/api/v1/assets?limit=15', 15],
+    ] as const) {
+      const response = await request(app, 'GET', path, headers);
+      assert.equal(response.status, 200);
+      assert.equal(response.body.total, 15);
+      assert.equal(response.body.limit, limit);
+      assert.deepEqual(queries.at(-1), {
+        q: '',
+        sort: 'symbol',
+        page: 1,
+        limit,
+      });
+    }
+  }
+  assert.equal(detailCalls, 0);
+  assert.equal(queries.length, 4);
+  for (const path of [
+    '/api/v1/assets?limit=15&unexpected=value',
+    '/api/v1/assets?limit=15&limit=20',
+    '/api/v1/assets?limit=0',
+    '/api/v1/assets/assets',
+  ]) {
+    const response = await request(app, 'GET', path);
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error, 'Invalid input');
+  }
+  assert.equal(detailCalls, 0);
+  assert.equal(queries.length, 4);
+});
+
 test('public catalog navigation through the proxy does not relax origin, CSRF, or private-route checks', async () => {
   const origin = 'https://market-pulse-five-sand.vercel.app';
   const fixture = memoryStore();
