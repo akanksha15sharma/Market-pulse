@@ -1,121 +1,102 @@
-# API comparison and usage strategy
+# Provider findings for the public MarketPulse product
 
-Public primary sources checked 2026-11-22. No account or credentialed API testing.
+Primary public sources reviewed 2026-11-24 through 2026-11-25 for Step A1. No account was created,
+provider contacted, key issued, credentialed API tested, or integration enabled.
+This replaces the original provider-selection proposal. The implemented crypto
+adapter is CoinPaprika, not CoinGecko. Stocks still use DEMO in current code.
 
-## Provider decision
+## Decision
 
-| Provider | Published free limits | Decision |
-|---|---|---|
-| CoinGecko Demo | 10,000 credits/month; 100 requests/minute; attribution required | Selected crypto provider; no free upstream WebSocket assumed |
-| Twelve Data Basic | 8 API credits/minute; 800/day; 8 trial WS credits | Conditional stock adapter candidate; disabled by default |
-| Alpha Vantage | Standard 25 requests/day | Not selected for frequent quotes |
-| Finnhub | Not verified during this review | Not selected; pricing page was unreadable |
-| Internal synthetic provider | No external requests | Selected stock baseline and CI provider |
+Prioritize genuine, permitted observations and keep all work within free allowances.
+Investigate official free stock widgets for display first. Do not select a native
+stock API until its exact plan permits our public display, caching, history, and
+server-side alerts. Existing crypto rights require the same review.
 
-CoinGecko supports batch crypto markets and price history. Confirm applicable
-display/storage terms before public release; attribution is mandatory. Demo access
-does not establish a general commercial redistribution license.
-Twelve Data Basic lists internal non-display usage; neither a private dashboard nor
-a public UI is presumed authorized. Credits are weighted by endpoint and symbol;
-batching does not necessarily reduce them. Trial WS credits are not a dependable
-ongoing streaming entitlement. Enable stock data only after verifying display,
-exchange, chart and caching rights for the exact account/use case.
-Alpha Vantage's real-time and 15-minute-delayed US stock data are premium. Its
-educational/open-source exceptions require provider verification, not assumption.
-Do not rely on remembered Finnhub quotas or candle entitlements.
+A free endpoint is an access mechanism, not a public redistribution license.
+Likewise, attribution, delaying a price, batching requests, or caching it does not
+supply missing permission. Read the [rights checklist](market-data-rights.md) before
+any implementation decision. No complete native provider is approved by A1.
 
-Sources: [CoinGecko pricing](https://www.coingecko.com/en/api/pricing),
-[Twelve Data pricing and weights](https://twelvedata.com/pricing),
-[Alpha Vantage support](https://www.alphavantage.co/support/),
-[Finnhub pricing](https://finnhub.io/pricing).
+## Evidence register
 
-## Endpoints and capabilities
+Limits below are published access limits, not product rights or guaranteed capacity.
+Recheck terms and actual account entitlements before any future enablement.
 
-Server-side CoinGecko Demo base: `https://api.coingecko.com/api/v3`, authenticated
-with `x-cg-demo-api-key`. One `/coins/markets` batch covers all ten catalog IDs in USD.
-Use `/coins/{id}/market_chart` for requested asset detail ranges. Local catalog search
-avoids upstream search per keystroke. No per-row quote or separate trending requests.
+| Provider                     | Reviewed evidence and limits                                                                                                                                                                                                                            | A1 assessment                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CoinPaprika                  | [API offering](https://coinpaprika.com/api) lists free personal access, 20,000 calls/month per IP, updates within ten minutes, and separate customer redistribution rights                                                                              | Existing genuine adapter; public distribution remains unapproved without appropriate evidence. Source attribution alone is insufficient              |
+| CoinGecko                    | [Licensing guidance](https://support.coingecko.com/articles/1043089972-what-are-the-differences-between-commercial-and-custom-licenses) says Demo does not include commercial rights and distinguishes public display from reusable data redistribution | Not an automatic free replacement; plan, audience, backend delivery, and storage need review                                                         |
+| Twelve Data                  | [Business Basic](https://twelvedata.com/pricing-business) lists 8 API credits/minute, 800/day, and internal non-display use; external display access is separately offered                                                                              | Native stock candidate only if suitable no-cost permission is documented. Batch requests can consume credits per symbol/endpoint                     |
+| Alpha Vantage                | [Support](https://www.alphavantage.co/support/) lists standard 25 requests/day; real-time and fifteen-minute delayed US data need other entitlements. [Terms](https://www.alphavantage.co/terms_of_service/) default to personal, noncommercial use     | Not cleared for our public service. Verified educational/open-source access does not automatically grant public-use rights                           |
+| Finnhub                      | [Terms](https://finnhub.io/terms-of-service) require written approval for sharing data or derived results with third parties; current numeric free quota was not confirmed from a readable primary pricing page                                         | Not selected; do not copy remembered quotas or assume free chart access                                                                              |
+| Massive, formerly Polygon    | [Individual terms](https://massive.com/legal/individuals-terms-of-service) govern personal non-business use, including free individual access                                                                                                           | Not cleared for public multi-user use; no native adapter is approved                                                                                 |
+| Financial Modeling Prep      | [Pricing and licensing notice](https://site.financialmodelingprep.com/developer/docs/pricing) lists Basic at 250 calls/day and requires a specific data display/licensing agreement                                                                     | Possible permission-request candidate; free access alone does not authorize this app                                                                 |
+| TradingView official widgets | [Widget offering](https://www.tradingview.com/widget/) provides free branded embeds. [Data FAQ](https://www.tradingview.com/widget-docs/faq/data/) describes delayed stock availability, symbol restrictions, and no general data API/export facility   | Preferred display-only candidate for later site/widget terms and five-symbol review. No extraction, backend quote cache, or MarketPulse stock alerts |
 
-Charts: 1D, 7D, 1M (30 days), 1Y (365 days). Demo history is restricted to the past
-365 days. Auto-granularity is five-minute for a current one-day range, hourly for
-2–90 days and daily above 90 days. These are price series, not OHLC candles.
-Validate response contracts and actual account access in Phase 4.
-[CoinGecko Demo chart reference](https://docs.coingecko.com/demo/reference/coins-id-market-chart)
+For widgets, also review [applicable policies](https://www.tradingview.com/policies/)
+and [attribution guidance](https://www.tradingview.com/widget-docs/faq/general/).
+An official public embed offering is not blanket approval for every site, symbol,
+commercial use, or machine-processing purpose.
 
-## Refresh and caching
+Exclude unofficial Yahoo scraping, extraction from embedded charts, and bypassing
+rate limits. [Yahoo API terms](https://legal.yahoo.com/us/en/yahoo/terms/product-atos/apitnc/index.html)
+restrict automated collection outside permitted interfaces. Stooq's public-use
+rights and applicable limits were not verified; downloadable CSV alone is not
+permission. The [Nasdaq Data Link WIKI notice](https://data.nasdaq.com/databases/WIKIP)
+says that feed stopped active support in April 2018, so it cannot supply current
+prices. A software library's license does not license its upstream market data.
 
-| Data | Policy |
-|---|---|
-| Crypto quote batch | Every 600 seconds while operating; one shared scheduler |
-| 1D chart | On demand; fresh cache for 30 minutes |
-| 7D/1M chart | On demand; fresh cache for 6 hours |
-| 1Y chart | On demand; fresh cache for 24 hours |
-| Synthetic stock series | Every 60 seconds while demo is active |
-| Browser polling | Every 60 seconds while visible; backend cache reads only |
-| Future entitled stock feed | Five-minute regular-session polling; disabled initially |
+## Capability comparison
 
-Real quote stale threshold: source observation older than 20 minutes or missing/
-untrustworthy source time. Retain fetched time separately; it does not prove freshness.
-Stale quotes cannot trigger alerts. Show stale/unavailable instead of fake replacements.
-Cache history provisionally for at most 48 hours, shorter if terms require; no
-permanent raw-provider archive. Browser chart refresh is not a provider refresh promise.
+| Data path                           | Genuine display                          | Our native history cache                        | Our stock alert evaluator                                                 |
+| ----------------------------------- | ---------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
+| Reviewed official widget            | Within embed terms and supported symbols | No widget extraction                            | Unavailable                                                               |
+| Rights-cleared end-of-day API       | Last-close labels                        | Only permitted daily observations and retention | Closing-price conditions only, if processing is permitted                 |
+| Rights-cleared delayed API          | Documented delay labels                  | Only supported intervals and retention          | Delayed conditions only, if processing is permitted                       |
+| Unverified free API or scraped feed | Not approved                             | Not approved                                    | Not approved                                                              |
+| Current DEMO provider               | Synthetic                                | Synthetic                                       | Already blocked for genuine alerts; excluded from intended public product |
 
-## CoinGecko budget: worst-case 31-day month
+No free native feed has been accepted for the full scope among the sources reviewed.
+This is not a claim that no suitable grant can ever exist. An explicit free grant
+can change the decision after its scope is checked. A paid-only answer leaves that
+capability unavailable unless the user separately changes the no-spend requirement.
 
-| Workload | Application ceiling |
-|---|---:|
-| Quote batches: 31 × 24 × 6 | 4,464 attempts |
-| History misses/refreshes: 80/day × 31 | 2,480 attempts |
-| Optional metadata maintenance: 1/day | 31 attempts |
-| Shared retry/manual integration reserve | 1,025 attempts |
-| Total hard application cap | 8,000 attempts |
-| Unallocated provider allowance | 2,000 credits |
+## Existing technical behavior, not a license grant
 
-Conservatively count/reserve every outbound attempt, including errors, against
-application budgets; this is not a claim every attempt is provider-billed. All
-retries consume the reserve AND total windows. Chart budget is global, not per user.
+The current CoinPaprika adapter uses fixed HTTPS ticker/history paths, validates
+payloads and timestamps, and shares ingestion across users. The engine attempts
+real crypto quote batches at ten-minute intervals while operating. Browser polling
+reads our backend cache; it does not imply a new provider observation every minute.
 
-Enforce provider-wide 10 attempts/minute, 260/day and 8,000/provider billing month.
-Enforce category caps too; daily maxima never override monthly or category limits.
-Prioritize scheduled quotes over charts. Return stale history or unavailable when
-budget is exhausted. Use the actual billing reset, not an assumed calendar month.
-Persist counters and next-fetch times so restarts cannot reset quota. Unknown quota
-window means live requests remain disabled until configured.
-CI and previews use synthetic data. Development with the same key shares the same
-budget; reconcile account usage before enabling live traffic.
+Current application ceilings are 10 attempts/minute, 260/day, 8,000/month, and
+80 chart attempts/day. They are deliberately lower than published access ceilings.
+They do not establish redistribution permission, and multiple environments or
+shared egress can consume the same provider allowance.
 
-## Optional stock budget, not enabled
+Current chart cache freshness is thirty minutes for 1D, six hours for 7D/1M, and
+one day for 1Y; stored history expires after 48 hours. These implemented settings
+are not proof of permitted retention. Future source-specific policies must use the
+stricter of the contractual retention limit and the application's cache policy.
+Do not create a permanent provider archive without explicit rights.
 
-Five symbols × 78 five-minute slots in a normal 390-minute session = 390 one-credit
-requests, plus at most five closing refreshes. Application ceiling: 6 credits/minute
-and 600/day, including 100 history credits and 105 retries/reference credits. This
-assumes one-credit endpoints only: re-evaluate weights and entitlements first.
-Pace requests instead of bursting. Use America/New_York and an exchange holiday/
-early-close calendar, never a fixed UTC offset. No extended-hours promise.
+## Examples for the later implementation
 
-## Enforcement and outages
+- Five stock rows in a watchlist do not require inventing five prices. Keep the
+  identities and show an approved embed or an unavailable state.
+- A daily close can support a daily chart if licensed. It cannot justify a
+  minute-by-minute native chart or a claim of intraday crossings.
+- A chart widget may show Apple while our API has no Apple quote. Keep those
+  capabilities separate; do not read its iframe to fill our quote table.
+- Five symbols requested in one HTTP call may still cost five credits. Verify
+  endpoint weights, reset windows, retries, and history costs before scheduling.
+- Re-fetching an old observation changes fetched time, not source time. It cannot
+  make that observation eligible for a newly armed alert.
 
-- Reserve quota atomically before outbound calls; scheduler lease per provider/time
-  slot; deduplicate chart cache misses; serialize upstream calls initially.
-- Separate client limits: initial 60 cache reads/minute/client and 6 history
-  requests/minute/user, still subordinate to global upstream budgets.
-- Ten-second request timeout; at most two budgeted retries for transient timeout/5xx
-  failures with exponential backoff/jitter. Never overlap duplicate scheduled jobs.
-- Honor 429 Retry-After; otherwise pause at least 60 seconds and increase backoff.
-  Daily/monthly exhaustion stops requests until the correct window resets.
-- 401/403 disables the affected integration pending correction; no credential loop.
-- Repeated failures open a circuit breaker; one budgeted recovery probe.
-- Record cache hits, provider attempts, latency, quota remaining and last success.
-- No scraping, automatic paid upgrades, key rotation or multiple accounts to evade caps.
+## Permission-request boundary
 
-## Email
-
-Resend free capacity: 3,000/month and 100/day. Application limits: 2,500/month and
-90/day; alerts at most 1,800/month and 60/day, leaving account-email headroom.
-All categories share total limits; prioritize verification/recovery and throttle resends.
-Initially pace one send request/second and honor response limits. Alert email expires
-after 24 hours if deferred; in-app history remains, with explicit delivery status.
-Verified sender domain required beyond the account's own test address. Use Mailpit
-locally; hosted email disabled until configured. Public demo cannot send arbitrary mail.
-[Resend pricing](https://resend.com/pricing),
-[Resend restrictions](https://resend.com/docs/api-reference/errors).
+A future permission request must describe public users, server-to-browser delivery,
+five stock symbols, historical display, retention, alert processing, attribution,
+and noncommercial/no-cost operation. Ask for the exact allowed datasets and limits.
+Do not send a request, accept terms, open accounts, or incur a charge under A1.
+Store only a non-sensitive rights summary in Git; keep private contracts and account
+identifiers in an appropriate private location.

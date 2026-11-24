@@ -1,80 +1,142 @@
-# Scope and acceptance criteria
+# MarketPulse public product scope
 
-Finalized for planning on 2026-11-22. Implementation awaits Phase 1 approval.
+Decision date: 2026-11-25. Step A1 is approved for documentation only.
+[ADR 0005](decisions/0005-public-product-scope-and-data-rights.md) supersedes the
+original demonstration scope. This document defines the intended public product;
+it does not claim that the changes below are deployed.
 
-## Product goal
+## Purpose and cost boundary
 
-Demonstrate typed full-stack development, secure accounts, relational modeling,
-shared API caching, financial calculations and recoverable alert delivery.
-“Live” means periodically refreshed observations, not exchange tick data.
-Every price view must show source, observation time and refresh policy.
+MarketPulse will help people follow a small set of genuine market observations,
+maintain private watchlists, and understand the source and age of their data.
+The first release is a low-traffic, noncommercial service within free allowances.
+Public access does not establish permission to redistribute a provider's data.
 
-## Version 1
+No paid plan, card-required trial, automatic overage, domain purchase, new service,
+or expanded ingestion is authorized. If a feature cannot legally or reliably work
+for free, explain its limitation and leave it unavailable. Do not invent a price.
 
-- Email/password accounts, cookie sessions, verification and password recovery.
-- Dashboard, market list, curated-catalog search and asset detail pages.
-- Interactive historical line charts and current allocation chart.
-- Multiple named watchlists with persistent membership.
-- Manual paper buys/sells, fees, weighted-average cost, realized/unrealized P&L.
-- One-time above/below alerts; pause, edit, rearm, delete and trigger history.
-- Persistent in-app inbox and optional queued email notifications.
-- Responsive, accessible UI with loading, empty, stale and error states.
-- Backend polling first; browser Socket.IO delivery in Phase 10.
+Example: a saved Apple watchlist item remains useful when its price is unavailable.
+Show “Price unavailable” and the reason; do not generate a plausible Apple price.
 
-Initial catalog: Bitcoin, Ethereum, Solana, XRP, Cardano, Dogecoin, Avalanche,
-Chainlink, Litecoin and Polkadot. Map by provider asset IDs, not ticker alone.
-Simulated US stocks: AAPL, MSFT, AMZN, GOOGL and NVDA. USD only.
-Search the local catalog; full-market discovery is outside version 1.
+## Implemented behavior versus the intended release
 
-Initial application limits: 5 watchlists/user, 20 items/list, 10 active alerts/user,
-1 portfolio/user and 50 asset subscriptions/socket. Schema permits future portfolios.
-These are product limits, not provider entitlements.
+| Area                            | Current implementation                                                                          | Intended public release                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Catalog                         | Ten cryptocurrencies and five stock identities; production seed completion is not verified here | Same stable identities; verify the approved seed separately                                                 |
+| Crypto                          | Genuine CoinPaprika adapter, plus a development/demo mode                                       | Public native data only after the exact display, storage, chart, and alert rights are confirmed             |
+| Stocks                          | Prices and history are simulated; configuration and SQL restrict stocks to demo-only            | No simulated observations in public views; an approved official widget or explicit unavailability initially |
+| Native stock feed               | No implemented real-stock adapter                                                               | Conditional on a documented no-cost permission covering the intended uses                                   |
+| Watchlists                      | Private PostgreSQL-backed lists                                                                 | Retain ownership, stable asset IDs, and existing limits                                                     |
+| Favorites                       | Stored in this browser                                                                          | Clearly distinguish browser favorites from account watchlists                                               |
+| Accounts                        | Registration, login, opaque sessions, revocation, CSRF                                          | Preserve security; verify production recovery before public launch                                          |
+| Recovery and verification email | Only local Mailpit delivery exists                                                              | Launch prerequisite for dependable password accounts, unless an approved alternative solves recovery        |
+| Alerts                          | Genuine fresh CoinPaprika crypto events; stock targets cannot trigger                           | Only rights-cleared observations and explicit monitoring availability                                       |
+| Notification inbox              | Table exists; complete inbox API/UI does not                                                    | Planned separately; event history is not a notification-delivery claim                                      |
+| Email alerts                    | Not implemented                                                                                 | Optional later work, only with an approved free delivery route and quota                                    |
+| Portfolios, trades, sockets     | No complete product implementation                                                              | Outside this release                                                                                        |
 
-## Real data versus demo mode
+This status is based on source inspection, not a new production test. Existing
+behavior remains unchanged by A1, including simulated stocks and blocked stock
+alerts. Removing public simulation requires a later approved implementation step.
 
-| Feature | Baseline | Required presentation |
-|---|---|---|
-| Crypto quotes/summaries | CoinGecko Demo when configured and permitted | Real observations, 10-minute polling, source timestamp, attribution |
-| Crypto charts | On-demand provider history, up to 365 days | Historical prices and supplied granularity; no invented candles |
-| Stock quotes/charts | Deterministic synthetic series | Persistent “Simulated stock data” labels |
-| Portfolio transactions | User-entered paper trades | “Simulated portfolio”; no brokerage execution |
-| Portfolio valuation | Quotes matching the portfolio's mode | Synthetic or incomplete valuation explicitly marked |
-| Crypto alerts | Fresh real observations in real-data mode | Poll-based, only while service operates |
-| Stock/demo alerts | Synthetic observations | “Demo alert”; no claim of a real threshold event |
-| In-app inbox | Persisted application events | Real/demo event provenance visible |
-| Email | Real only when configured; Mailpit locally otherwise | Hosted email-unavailable state when disabled |
+## Initial audience and assets
 
-Support the baseline (real crypto plus simulated stocks) and an entirely synthetic
-sandbox for previews, tests and credential-free demos. Mode belongs in quote/cache
-identity, alert context and portfolio context. Separate real and sandbox portfolios;
-never present a valuation containing synthetic stocks as a real combined market value.
-Never silently replace unavailable real quotes with synthetic prices.
-Anonymous demo writes must be visitor-isolated or disabled; demo sessions cannot
-send arbitrary recipients email.
+Keep the existing USD catalog:
 
-## Alert semantics
+- Crypto: BTC, ETH, SOL, XRP, ADA, DOGE, AVAX, LINK, LTC, DOT.
+- US stocks: AAPL, MSFT, AMZN, GOOGL, NVDA.
 
-Above means >=; below means <=. If already satisfied, the next fresh observation
-after arming may trigger; explain this in the form. Require an observation fetched
-after arming and a trustworthy source timestamp. One event per activation; rearming
-starts another. Reject invalid, duplicate, stale and out-of-order observations.
-Paused/triggered alerts are not evaluated. No reconstruction of missed crossings
-after downtime. Delay may include a full polling interval plus provider/processing
-lag while running; this is not an SLA. Email acceptance is not proof of inbox delivery.
+Use stable asset UUIDs and provider mappings, not ticker text alone. For example,
+`stock:NASDAQ:AAPL` identifies the existing catalog asset; a future provider's
+symbol is a mapping, not a reason to recreate that asset.
 
-## Deferred
+Keep five watchlists per account, twenty items per list, and ten active alerts per
+account unless a later approved step changes them. These application limits do
+not grant provider rights or guarantee a number of public users.
 
-Broker/exchange linking, actual trades, payments, multi-currency, Indian stocks,
-recurring crossing alerts, full-market discovery, taxes, split/dividend accounting,
-historical portfolio returns, predictions, news, candlesticks, Redis, microservices
-and horizontal API scaling. Paper stock accounting is not corporate-action-adjusted.
+## Two data paths
 
-## Roadmap remains unchanged
+```mermaid
+flowchart TD
+    Asset[Catalog asset] --> Rights{Permission for intended use recorded?}
+    Rights -->|No| Unavailable[Keep identity and show unavailable data]
+    Rights -->|Official embed only| Widget[Genuine provider-hosted display]
+    Rights -->|Native API rights| Native[Backend quotes and permitted history]
+    Widget --> NoAlert[No extraction, backend cache, or stock evaluation]
+    Native --> AlertRights{Non-display alert rights and eligible observations?}
+    AlertRights -->|No| Display[Display only]
+    AlertRights -->|Yes| Evaluate[Evaluate conditions while monitoring operates]
+```
 
-0 scope/providers/architecture; 1 repository foundation; 2 database; 3 authentication;
-4 market backend; 5 market UI; 6 watchlists; 7 portfolio; 8 alerts; 9 notifications;
-10 socket delivery; 11 hardening; 12 deployment/presentation.
+A widget is a small provider-hosted component embedded in the page. Its displayed
+price does not become a value our server may copy. A native feed is data fetched
+by our server, which needs its own permissions and limits.
 
-Later verification: provider normalization/quota tests in Phase 4; hand-calculated
-ledger and concurrent-sale tests in Phase 7; stale/duplicate/restart alert tests in
-Phase 8; isolation/reconnect tests in Phase 10; cold-start/release checks in Phase 12.
+Prefer investigating official free stock widgets first. This is a direction for
+later review, not approval of a provider, widget implementation, or data ingestion.
+A fully integrated stock feed remains conditional; no reviewed standard free plan
+has yet been accepted for all required public display, caching, charts, and alerts.
+See [provider findings](data-providers.md) and the
+[rights acceptance checklist](market-data-rights.md).
+
+## Required presentation
+
+Every native observation must identify its source, observation time, and applicable
+refresh/delay policy. Keep fetched time separate: downloading yesterday's close
+now does not turn it into a current trade.
+
+Use accurate labels:
+
+- **Delayed:** the source documents a delay; state the actual applicable delay.
+- **Last close:** a completed market session's closing observation.
+- **Stale:** outside that dataset's permitted freshness window.
+- **Unavailable:** no usable or permitted observation can be supplied.
+- **Embedded display:** the external component owns the displayed data; native
+  quote, chart, and alert capability may be absent.
+
+A weekend closing price is not necessarily bad data, but it must remain labeled
+as a last close. Do not fabricate missing chart points, infer a traded price from
+a drawing, or use synthetic data to fill an outage. Synthetic test fixtures remain
+allowed in isolated automated tests; they are never production observations.
+
+## Alert promises
+
+Above means greater than or equal to the target; below means less than or equal.
+The next eligible observation after arming can satisfy a target already reached.
+This is an observed target condition, not proof of every intraday crossing.
+
+Preserve decimal comparisons, post-arm source/fetch times, one event per activation,
+owner authorization, and atomic quote/event writes. An atomic write commits all
+related records together or rolls all of them back.
+
+A widget cannot drive MarketPulse alerts. An end-of-day feed could support only a
+clearly labeled closing-price condition if its license allows it. A delayed feed
+needs its own freshness/calendar rules. Existing crypto-specific code and SQL
+constraints must be reviewed together before any stock evaluation is enabled.
+
+Monitoring can stop while free hosts sleep or quotas are exhausted. Do not promise
+immediate alerts, uninterrupted monitoring, reconstruction of missed crossings, or
+email delivery before those capabilities exist and are verified.
+
+## Release prerequisites
+
+1. Record dataset-specific public-use rights and all retention/attribution duties.
+2. Remove simulated observations from the public release through approved code work.
+3. Verify catalog availability without replacing IDs or deleting user records.
+4. Verify production login, recovery, ownership, session rotation, and CSRF.
+5. Test source timestamps, unavailable states, quota handling, and monitoring gaps.
+6. Verify keyboard, screen-reader, mobile, and third-party-display fallbacks.
+7. Verify free hosting eligibility, account limits, backup, and restore procedures.
+8. Deploy only reviewed changes; approve production database operations separately.
+
+These are acceptance gates, not a claim that A1 completes them.
+
+## Exclusions and next approval
+
+No trade execution, simulated portfolio product, predictions, full-market search,
+paid market feed, guaranteed timing, or unlimited-scale promise is included.
+Do not migrate users or replace the working hosting stack as part of A1.
+
+Next: A2 establishes the existing release baseline and acceptance evidence.
+It requires separate approval. A1 authorizes no A2 implementation or deployment.

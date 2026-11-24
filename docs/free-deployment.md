@@ -1,9 +1,27 @@
 # A $0 MarketPulse deployment plan
 
-Researched against official provider documentation on 2026-11-23. This is a
+## A1 public-product boundary — 2026-11-25
+
+[Public scope](scope.md), [provider findings](data-providers.md), and the
+[rights checklist](market-data-rights.md) supersede any implication below that
+free hosting or existing provider access clears public market-data use. A1 changes
+documentation only: no host, secret, billing setting, scheduler, or deployment is
+changed. Preserve the working Vercel/Render/Neon setup and its security.
+
+The intended public release excludes simulated observations. Current stocks remain
+simulated in code until a later approved implementation step. An official free
+widget is a display-only candidate; native stock data and alerts need explicit
+no-cost rights. Existing CoinPaprika public distribution also remains a rights
+gate. No paid plan, automatically billed overage, or new service is authorized.
+Check actual free-account limits and billing controls before any release; stop
+work that would incur charges. Free infrastructure cannot promise continuous alerts.
+
+The operational profile below was researched on 2026-11-23; recheck account limits
+before a separately approved release. This is a
 personal/noncommercial, low-traffic deployment plan, with **best-effort background
 alerts**. It is not a promise of uninterrupted availability or immediate alerts.
-No services, credentials, paid plans, deployments, or ingestion jobs have been enabled.
+This document does not establish current live account state or authorize enabling
+services, credentials, paid plans, deployments, or ingestion jobs.
 
 ## Recommendation
 
@@ -13,7 +31,7 @@ No services, credentials, paid plans, deployments, or ingestion jobs have been e
 | Backend           | One Render Free Node web service                | Runs Express and existing authentication without a serverless rewrite                    |
 | PostgreSQL        | Neon Free                                       | Persistent PostgreSQL for the existing Prisma schema and user data                       |
 | Authentication    | Existing MarketPulse sessions stored in Neon    | No additional auth vendor, MAU subscription, user migration, or identity changes         |
-| Prices/history    | Existing keyless CoinPaprika integration        | Reuses approved quotas and explicit real/simulated/unavailable labeling                  |
+| Prices/history    | Existing keyless CoinPaprika integration        | Implemented adapter and technical budgets; public-use rights remain unresolved           |
 | Background alerts | Optional public-repository GitHub Actions batch | Fetches/evaluates observations directly while the API sleeps; nominally every 30 minutes |
 
 Keep the API's existing bounded, on-demand worker for active visitors. Keep the
@@ -81,7 +99,9 @@ CoinPaprika Free currently advertises keyless access, 20,000 requests/month per
 IP, 2,000 assets, and one year of daily prices for personal use. Shared egress IPs
 and provider restrictions can still cause throttling or unavailable history.
 MarketPulse's tighter persisted budgets remain unchanged; no plan is upgraded and
-no unavailable real history becomes synthetic. Stocks remain explicitly simulated.
+no unavailable real history becomes synthetic. Current code still selects simulated stocks; this is not the intended public
+release scope. Do not change modes under A1 or assume the unresolved rights permit
+expanded public ingestion.
 [Provider plan](https://coinpaprika.com/api/pricing),
 [historical endpoint](https://docs.coinpaprika.com/api-reference/tickers/get-historical-ticks-for-a-specific-coin).
 
@@ -125,7 +145,9 @@ cannot be promised on this $0 stack. No always-on worker capability is removed.
 | `npm run worker:once`               | One ingestion/evaluation batch, then close connections                                          |
 | `npm run test:deployment`           | Regression checks for template boundaries and workflow opt-in/billing guards                    |
 
-These example files are not active root deployment configuration. Creating/importing
+The files under `deploy/` are templates. The separate root `vercel.json` is
+active configuration and already targets the Render service; do not replace it
+with the placeholder example. Creating/importing
 services, copying an active configuration, enabling the scheduler, or adding host
 secrets requires approval. The Render template has no automatic migration/seed
 command. The Vercel template deliberately uses `api.example.invalid`, which must
@@ -151,6 +173,11 @@ migration credentials for DDL, and remember that the seed uses `DATABASE_URL`.
 Do not use a broad runtime role solely for seeding convenience.
 
 ### 2. API
+
+The following environment block describes existing code compatibility, not an
+A1 public-release recommendation or permission to enable the unresolved data feed.
+Do not copy settings into production as part of A1. Future unavailable/widget modes
+require code changes before any new settings can be used.
 
 Review `deploy/render.example.yaml` from the repository root. If approved, configure
 one Free Node service using its build/start commands; select no paid worker or
@@ -215,7 +242,8 @@ to SameSite=None or remove their security attributes to work around a bad proxy.
 
 ### 4. Optional background schedule
 
-After explicit approval of background data access, the repository owner can:
+Only after provider rights, free-runner eligibility, and explicit approval of
+background data access are established, the repository owner can:
 
 - Confirm that this is already a public repository and that standard runner and
   data-provider use fits their account policies. Do not change repository visibility
@@ -240,7 +268,7 @@ routing; Vercel's documented rewrite makes the selected split straightforward.
 Putting this long-running Express/worker stack into Vercel Functions would require
 a lifecycle redesign. Replacing Prisma/PostgreSQL or custom authentication to chase
 a different free service would add migration risk without fixing source-data or
-scheduler availability. Neither is necessary for this personal-demo profile.
+scheduler availability. Neither is necessary for the existing free operational profile.
 
 If the requirement is uninterrupted monitoring with prompt alerts and dependable
 account recovery, this plan does not meet it. That needs a separately approved

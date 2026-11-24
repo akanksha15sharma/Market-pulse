@@ -4,6 +4,12 @@ A responsive cryptocurrency and stock market tracker built with React 19, TypeSc
 Vite, Express 5, Prisma 7, and PostgreSQL 17. Prices are in USD. This is a portfolio
 project, with explicit source, freshness, and simulation labels throughout.
 
+The approved [A1 public-product scope](docs/scope.md) prioritizes genuine, permitted
+data and a completely free release. Current simulated stocks and unresolved provider
+rights are documented there as implementation/release gaps, not completed changes.
+See the [licensing checklist](docs/market-data-rights.md) before public expansion.
+A1 updates documentation only and does not authorize the next implementation step.
+
 ## Features
 
 - **Markets:** 10 curated cryptocurrencies and 5 stocks, price cards, search, type
