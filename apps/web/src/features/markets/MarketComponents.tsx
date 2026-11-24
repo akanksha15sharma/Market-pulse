@@ -119,6 +119,7 @@ export function MarketPolicy(_props: {
   workerEnabled: boolean;
   providers?: MarketStatus['providers'];
 }) {
+  void _props;
   return (
     <aside className="market-policy" aria-label="Market data information">
       <div>

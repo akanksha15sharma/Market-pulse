@@ -7,6 +7,7 @@ const child = spawn(
     '--import',
     'tsx',
     '--test',
+    'tests/tradingview.test.tsx',
     'tests/auth.test.tsx',
     'tests/markets.test.tsx',
     'tests/watchlists.test.tsx',

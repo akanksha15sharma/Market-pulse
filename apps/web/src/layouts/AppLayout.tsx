@@ -1,6 +1,8 @@
+import { useMarketTheme } from '../features/markets/theme';
 import { Link, NavLink, Outlet } from 'react-router';
 
 export function AppLayout() {
+  const { theme, toggle } = useMarketTheme();
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <a
@@ -24,6 +26,14 @@ export function AppLayout() {
             MarketPulse
           </Link>
           <div className="nav-links flex gap-5 text-sm">
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggle}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'} mode
+            </button>
             <NavLink
               to="/markets"
               className="text-slate-300 hover:text-teal-300"

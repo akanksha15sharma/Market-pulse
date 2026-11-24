@@ -1,35 +1,16 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Link, useParams } from 'react-router';
 import { z } from 'zod';
-import { type HistoryRange } from '@marketpulse/contracts';
-import {
-  historyInterval,
-  loadAsset,
-  loadHistory,
-} from '../features/markets/api';
-import {
-  AssetInformation,
-  HistoryRangeFilters,
-} from '../features/markets/AssetInformation';
+import { loadAsset } from '../features/markets/api';
+import { AssetInformation } from '../features/markets/AssetInformation';
 import { useMarketResource } from '../features/markets/use-market-resource';
-const HistoryChart = lazy(() =>
-  import('../features/markets/HistoryChart').then((module) => ({
-    default: module.HistoryChart,
-  })),
-);
 import {
-  DataLabel,
-  QuoteNotice,
   MarketLoading,
-  MarketSourcePolicy,
   ResourceError,
+  MarketSourcePolicy,
 } from '../features/markets/MarketComponents';
-import {
-  change,
-  money,
-  observed,
-  quoteStatus,
-} from '../features/markets/presentation';
+import { TradingViewWidget } from '../features/markets/TradingViewWidget';
+import { tradingViewSymbol } from '../features/markets/tradingview';
 
 export function AssetDetailPage() {
   const { id = '' } = useParams();
@@ -38,129 +19,56 @@ export function AssetDetailPage() {
       <section className="catalog-empty">
         <h1>Asset not found</h1>
         <p>Choose an asset from the curated market catalog.</p>
-        <Link to="/markets" className="secondary-button">
-          Explore markets
-        </Link>
+        <Link to="/markets">Explore markets</Link>
       </section>
     );
   return <AssetDetail key={id} id={id} />;
 }
 function AssetDetail({ id }: { id: string }) {
-  const [range, setRange] = useState<HistoryRange>('1D');
   const request = useCallback(
     (signal: AbortSignal) => loadAsset(id, signal),
     [id],
   );
-  const asset = useMarketResource(request);
-  // History is mounted only after the catalog confirms that this asset exists.
+  const { data, loading, error, retry } = useMarketResource(request);
+  const symbol = data ? tradingViewSymbol(data.asset) : null;
   return (
     <div className="asset-detail">
       <Link className="back-link" to="/markets">
         All markets
       </Link>
-      {asset.loading && <MarketLoading refreshing={!!asset.data} />}
-      {asset.error && (
-        <ResourceError message={asset.error} retry={asset.retry} />
-      )}
-      {asset.data && (
+      {loading && <MarketLoading refreshing={!!data} />}
+      {error && <ResourceError message={error} retry={retry} />}
+      {data && (
         <>
           <div className="market-heading">
             <div>
               <p className="eyebrow">
-                {asset.data.asset.type === 'STOCK'
-                  ? 'Stock · Simulated stock data'
-                  : 'Cryptocurrency'}{' '}
-                · USD
+                {data.asset.type === 'STOCK' ? 'Stock' : 'Cryptocurrency'} · USD
               </p>
               <h1>
-                {asset.data.asset.name}{' '}
-                <span className="asset-symbol">{asset.data.asset.symbol}</span>
+                {data.asset.name}{' '}
+                <span className="asset-symbol">{data.asset.symbol}</span>
               </h1>
               <p className="market-subtitle">
-                {asset.data.asset.exchange ?? 'Crypto market'} · Historical
-                price observations
+                Explore price history with TradingView's interactive chart.
               </p>
             </div>
-            {asset.data.quote && (
-              <DataLabel simulated={asset.data.quote.simulated} />
-            )}
           </div>
-          <section className="asset-price-panel" aria-label="Current price">
-            <div>
-              <span className="eyebrow">Latest cached price</span>
-              <p className="detail-price">{money(asset.data.quote?.price)}</p>
-            </div>
-            <div>
-              <span className="eyebrow">24h change</span>
-              <p
-                className={`detail-change ${asset.data.quote?.changePercent != null && Number(asset.data.quote.changePercent) < 0 ? 'negative' : 'positive'}`}
-              >
-                {change(asset.data.quote?.changePercent)}
-              </p>
-            </div>
-            <div className="observation-meta">
-              <strong className={`status-${quoteStatus(asset.data.quote)}`}>
-                {quoteStatus(asset.data.quote)}
-              </strong>
+          {symbol ? (
+            <TradingViewWidget symbol={symbol} name={data.asset.name} />
+          ) : (
+            <section className="catalog-empty">
+              <h2>Market display unavailable</h2>
               <p>
-                {asset.data.quote?.provider ?? 'Source pending'} · Observed{' '}
-                {observed(asset.data.quote?.sourceAt)}
+                This instrument does not yet have a verified display mapping.
+                Your saved asset is preserved.
               </p>
-              <p>Cache fetched {observed(asset.data.quote?.fetchedAt)}</p>
-              <QuoteNotice quote={asset.data.quote} />
-            </div>
-          </section>
-          <section className="market-panel" aria-labelledby="history-heading">
-            <div className="panel-heading">
-              <div>
-                <h2 id="history-heading">Price history</h2>
-                <p>Explore observations, one point at a time.</p>
-              </div>
-              <HistoryRangeFilters range={range} onChange={setRange} />
-            </div>
-            <AssetHistory
-              key={`${range}:${asset.data.quote?.provider}`}
-              expectedProvider={asset.data.quote?.provider}
-              id={id}
-              range={range}
-              name={asset.data.asset.name}
-            />
-          </section>
-          <AssetInformation asset={asset.data.asset} />
-          <MarketSourcePolicy status={asset.data.status} />
+            </section>
+          )}
+          <AssetInformation asset={data.asset} />
+          <MarketSourcePolicy status={data.status} />
         </>
       )}
     </div>
-  );
-}
-function AssetHistory({
-  id,
-  range,
-  name,
-  expectedProvider,
-}: {
-  expectedProvider?: 'DEMO' | 'COINPAPRIKA';
-  id: string;
-  range: HistoryRange;
-  name: string;
-}) {
-  const request = useCallback(
-    (signal: AbortSignal) => loadHistory(id, range, signal, expectedProvider),
-    [id, range, expectedProvider],
-  );
-  const { data, loading, error, retry } = useMarketResource(
-    request,
-    historyInterval,
-  );
-  return (
-    <>
-      {loading && <MarketLoading refreshing={!!data} />}
-      {error && <ResourceError message={error} retry={retry} />}
-      {data && (
-        <Suspense fallback={<MarketLoading />}>
-          <HistoryChart history={data} name={name} />
-        </Suspense>
-      )}
-    </>
   );
 }

@@ -4,24 +4,16 @@ import { useFavorites } from '../features/markets/favorites';
 import { loadOverview } from '../features/markets/api';
 import { useMarketResource } from '../features/markets/use-market-resource';
 import {
-  DataLabel,
   MarketLoading,
   MarketSourcePolicy,
-  QuoteCard,
-  QuoteNotice,
   ResourceError,
 } from '../features/markets/MarketComponents';
-import {
-  change,
-  filterAssets,
-  money,
-  observed,
-  quoteStatus,
-} from '../features/markets/presentation';
+import { filterAssets } from '../features/markets/presentation';
+import { TradingViewWidget } from '../features/markets/TradingViewWidget';
+import { tradingViewSymbol } from '../features/markets/tradingview';
 
 export function MarketDashboardPage() {
-  const { data, error, loading, retry, checkedAt } =
-    useMarketResource(loadOverview);
+  const { data, error, loading, retry } = useMarketResource(loadOverview);
   const [params, setParams] = useSearchParams();
   const { favorites, toggle } = useFavorites();
   const favoritesOnly = params.get('favorites') === 'true';
@@ -47,10 +39,6 @@ export function MarketDashboardPage() {
     sort,
     favoritesOnly ? favorites : undefined,
   );
-  const featured =
-    data?.assets.filter((asset) =>
-      ['BTC', 'ETH', 'SOL', 'AAPL'].includes(asset.symbol),
-    ) ?? [];
   return (
     <div className="market-dashboard">
       <div className="market-heading">
@@ -65,33 +53,12 @@ export function MarketDashboardPage() {
           Curated catalog<span>10 cryptocurrencies · 5 stocks</span>
         </span>
       </div>
+      <TradingViewWidget />
       {loading && <MarketLoading refreshing={!!data} />}
       {error && <ResourceError message={error} retry={retry} />}
       {data && (
         <>
           <MarketSourcePolicy status={data.status} />
-          <p className="price-meta" role="status">
-            Last checked: {observed(checkedAt)} · Auto-refresh every 60 seconds
-            while visible. Prices were last updated at the observation times
-            shown below.
-          </p>
-          <section aria-labelledby="snapshot-heading">
-            <div className="section-heading">
-              <h2 id="snapshot-heading">Market snapshot</h2>
-              <span>24-hour price change</span>
-            </div>
-            <div className="price-cards">
-              {featured.map((asset) => (
-                <QuoteCard
-                  key={asset.id}
-                  asset={asset}
-                  quote={data.quotes.find(
-                    (quote) => quote.assetId === asset.id,
-                  )}
-                />
-              ))}
-            </div>
-          </section>
           <section className="market-panel" aria-labelledby="catalog-heading">
             <div className="panel-heading">
               <div>
@@ -173,18 +140,11 @@ export function MarketDashboardPage() {
                         <span className="sr-only">Favorite</span>
                       </th>
                       <th scope="col">Asset</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">24h change</th>
-                      <th scope="col">Data source</th>
-                      <th scope="col">Observation</th>
+                      <th scope="col">Market display</th>
                     </tr>
                   </thead>
                   <tbody>
                     {assets.map((asset) => {
-                      const quote = data.quotes.find(
-                        (value) => value.assetId === asset.id,
-                      );
-                      const state = quoteStatus(quote);
                       return (
                         <tr key={asset.id}>
                           <td>
@@ -213,30 +173,14 @@ export function MarketDashboardPage() {
                               </span>
                             </Link>
                           </th>
-                          <td className="numeric">{money(quote?.price)}</td>
-                          <td
-                            className={`numeric ${quote?.changePercent != null && Number(quote.changePercent) < 0 ? 'negative' : 'positive'}`}
-                          >
-                            {change(quote?.changePercent)}
-                          </td>
                           <td>
-                            {quote ? (
-                              <>
-                                <DataLabel simulated={quote.simulated} />
-                                <span className="muted block source-name">
-                                  {quote.provider}
-                                </span>
-                              </>
+                            {tradingViewSymbol(asset) ? (
+                              <Link to={`/assets/${asset.id}`}>
+                                View interactive chart · TradingView
+                              </Link>
                             ) : (
-                              'Source pending'
+                              'Market display unavailable'
                             )}
-                          </td>
-                          <td>
-                            <span className={`status-${state}`}>{state}</span>
-                            <span className="muted block source-name">
-                              Last updated {observed(quote?.sourceAt)}
-                            </span>
-                            <QuoteNotice quote={quote} />
                           </td>
                         </tr>
                       );
@@ -265,8 +209,8 @@ export function MarketDashboardPage() {
               </div>
             )}
             <div className="panel-footnote">
-              USD prices · No exchange tick feed · Select an asset for
-              historical observations
+              USD displays · Select an asset for interactive history ·
+              Availability and delays vary by source
             </div>
           </section>
         </>

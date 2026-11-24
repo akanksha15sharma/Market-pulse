@@ -115,6 +115,14 @@ async function readStatus(signal: AbortSignal) {
   }
 }
 export async function loadOverview(signal: AbortSignal) {
+  if (import.meta.env?.PROD) {
+    const catalog = await read('/assets?limit=15', catalogSchema, signal);
+    return {
+      assets: catalog.assets,
+      quotes: [] as z.infer<typeof quoteSchema>[],
+      status: null,
+    };
+  }
   const [catalog, prices, status] = await Promise.all([
     read('/assets?limit=15', catalogSchema, signal),
     read('/quotes', quotesSchema, signal),
@@ -128,6 +136,14 @@ export async function loadOverview(signal: AbortSignal) {
   };
 }
 export async function loadAsset(id: string, signal: AbortSignal) {
+  if (import.meta.env?.PROD) {
+    const detail = await read(
+      `/assets/${encodeURIComponent(id)}`,
+      z.object({ asset: assetSchema }),
+      signal,
+    );
+    return { asset: detail.asset, quote: undefined, status: null };
+  }
   const [detail, prices, status] = await Promise.all([
     read(
       `/assets/${encodeURIComponent(id)}`,
