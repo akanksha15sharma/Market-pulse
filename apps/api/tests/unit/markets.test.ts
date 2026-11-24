@@ -463,6 +463,88 @@ test('REST validates filters/ranges/IDs, hides provider mappings and returns exp
   assert.ok(!JSON.stringify(status.body).includes('synthetic-secret'));
 });
 
+test('public catalog navigation through the proxy does not relax origin, CSRF, or private-route checks', async () => {
+  const origin = 'https://market-pulse-five-sand.vercel.app';
+  const fixture = memoryStore();
+  const market = createMarketService(fixture.store, demo);
+  const app = createApp(
+    { limit: async () => {} } as unknown as AuthService,
+    { origin, secret: 'a'.repeat(64), secure: true, ttlSeconds: 3600 },
+    market,
+  );
+  const navigation = {
+    'sec-fetch-site': 'cross-site',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-user': '?1',
+    'x-forwarded-host': 'market-pulse-five-sand.vercel.app',
+    'x-forwarded-proto': 'https',
+  };
+  for (const method of ['GET', 'HEAD']) {
+    const response = await request(
+      app,
+      method,
+      '/api/v1/assets?limit=15',
+      navigation,
+    );
+    assert.equal(response.status, 200);
+    if (method === 'GET') {
+      assert.equal(response.body.total, 15);
+      assert.equal((response.body.assets as unknown[]).length, 15);
+    }
+    assert.equal(response.headers['access-control-allow-origin'], undefined);
+    assert.equal(response.headers['set-cookie'], undefined);
+    assert.equal(response.headers['cache-control'], 'no-store');
+    assert.equal(
+      response.headers['strict-transport-security'],
+      'max-age=31536000',
+    );
+  }
+  for (const headers of [
+    { 'sec-fetch-site': 'same-origin' },
+    { origin, 'sec-fetch-site': 'same-origin' },
+  ] as Record<string, string>[]) {
+    assert.equal(
+      (await request(app, 'GET', '/api/v1/assets?limit=15', headers)).status,
+      200,
+    );
+  }
+  for (const headers of [
+    { ...navigation, origin: 'https://untrusted.example' },
+    { ...navigation, origin: 'null' },
+    { ...navigation, origin },
+    { ...navigation, 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+    { ...navigation, 'sec-fetch-dest': 'iframe' },
+    { 'sec-fetch-site': 'cross-site' },
+    {
+      ...navigation,
+      origin: 'https://untrusted.example',
+      'x-forwarded-origin': origin,
+    },
+  ] as Record<string, string>[]) {
+    const response = await request(
+      app,
+      'GET',
+      '/api/v1/assets?limit=15',
+      headers,
+    );
+    assert.equal(response.status, 403);
+    assert.equal(response.body.error, 'Request origin is not allowed');
+  }
+  for (const [method, path] of [
+    ['POST', '/api/v1/assets'],
+    ['OPTIONS', '/api/v1/assets'],
+    ['GET', '/api/v1/auth/csrf'],
+    ['GET', '/api/v1/private/profile'],
+    ['GET', '/api/v1/watchlists'],
+    ['GET', '/api/v1/health/ready'],
+    ['GET', '/api/v1/assets/extra'],
+    ['POST', '/api/v1/auth/logout'],
+  ] as const) {
+    assert.equal((await request(app, method, path, navigation)).status, 403);
+  }
+});
+
 test('empty catalogs return successful collections while missing assets and routes have distinct 404s', async () => {
   const market = createMarketService(memoryStore([]).store, demo);
   const app = createApp(

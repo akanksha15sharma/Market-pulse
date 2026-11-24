@@ -58,9 +58,17 @@ export function createApp(
     );
   });
   app.use((req, _res, next) => {
+    // Opening the public catalog from an external link is a navigation, not
+    // a cross-origin API fetch. Do not infer an allowed Origin from proxy headers.
+    const catalogNavigation =
+      ['GET', 'HEAD'].includes(req.method) &&
+      req.path === '/api/v1/assets' &&
+      !req.get('origin') &&
+      req.get('sec-fetch-mode') === 'navigate' &&
+      req.get('sec-fetch-dest') === 'document';
     if (
       (req.get('origin') && req.get('origin') !== config.origin) ||
-      req.get('sec-fetch-site') === 'cross-site' ||
+      (req.get('sec-fetch-site') === 'cross-site' && !catalogNavigation) ||
       (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
         req.get('origin') !== config.origin)
     )
