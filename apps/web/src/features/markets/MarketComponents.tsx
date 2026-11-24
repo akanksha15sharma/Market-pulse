@@ -113,132 +113,36 @@ export function MarketLoading({
     </div>
   );
 }
-export function MarketPolicy({
-  cryptoMode,
-  cryptoSeconds,
-  workerEnabled,
-  providers,
-}: {
+export function MarketPolicy(_props: {
   cryptoMode: string;
   cryptoSeconds: number;
   workerEnabled: boolean;
   providers?: MarketStatus['providers'];
 }) {
-  const live = providers?.find(
-    (provider) => provider.provider === 'COINPAPRIKA',
-  );
-  const monthly = live?.budgets.find(
-    (budget) => budget.category === 'all:month',
-  );
-  const charts = live?.budgets.find(
-    (budget) => budget.category === 'charts:day',
-  );
   return (
-    <aside
-      className="market-policy"
-      aria-label="Data sources and refresh policy"
-    >
-      <span className="policy-icon" aria-hidden="true">
-        i
-      </span>
+    <aside className="market-policy" aria-label="Market data information">
       <div>
-        <strong>Know your data.</strong> Stocks always use simulated stock data.{' '}
-        {cryptoMode === 'demo' ? (
-          'Crypto prices are also simulated.'
-        ) : (
-          <>
-            Powered by{' '}
-            <a
-              href="https://coinpaprika.com/api"
-              target="_blank"
-              rel="noreferrer"
-            >
-              CoinPaprika
-            </a>
-            .
-          </>
-        )}
+        <strong>Market data information.</strong>
         <p>
-          Browser checks cached prices every 60 seconds while visible. Crypto
-          source refresh: {cryptoSeconds / 60} min; simulated stocks: 1 min.{' '}
-          {workerEnabled
-            ? 'Updates depend on the backend worker running.'
-            : 'The market worker is disabled; cached observations may become stale.'}
+          Native prices and price alerts are currently unavailable. Charts are
+          informational; check the provider's source, observation time and delay
+          indicators. Data may be delayed or unavailable and is not investment
+          advice.
         </p>
-        {cryptoMode === 'coinpaprika' && (
-          <div className="live-feed-status" role="status">
-            <strong>
-              {live?.quoteReason
-                ? 'Live crypto updates unavailable'
-                : 'Real crypto mode selected'}
-            </strong>
-            {live?.quoteReason && (
-              <p>
-                {marketReason(live.quoteReason)} Prices retain their real source
-                or stay unavailable.
-              </p>
-            )}
-            {live?.historyReason && live.historyReason !== live.quoteReason && (
-              <p>Historical charts: {marketReason(live.historyReason)}</p>
-            )}
-            <p>
-              Free history uses hourly observations for 1D and daily
-              observations for 7D, 1M and 1Y. Availability varies by asset.
-            </p>
-            <p>
-              No silent fallback to simulated crypto. Stocks remain simulated.
-            </p>
-            {live?.lastSuccessAt && (
-              <p>
-                Last successful provider request: {observed(live.lastSuccessAt)}
-              </p>
-            )}
-            {live?.blockedUntil && (
-              <p>Provider pause until {observed(live.blockedUntil)}</p>
-            )}
-            {monthly && (
-              <p>
-                Application live request budget remaining this UTC month:{' '}
-                {monthly.remaining}.{' '}
-                {charts &&
-                  `Chart requests remaining today: ${charts.remaining}.`}
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </aside>
   );
 }
-
 export function MarketSourcePolicy({
   status,
 }: {
   status: MarketStatus | null;
 }) {
-  if (status)
-    return (
-      <MarketPolicy
-        cryptoMode={status.cryptoMode}
-        cryptoSeconds={status.refreshSeconds.crypto}
-        workerEnabled={status.workerEnabled}
-        providers={status.providers}
-      />
-    );
   return (
-    <aside
-      className="market-policy"
-      aria-label="Data sources and refresh policy"
-    >
-      <div>
-        <strong>Provider status temporarily unavailable.</strong>
-        <p>
-          Prices show the source and observation time returned by the API.
-          Browser checks cached prices every 60 seconds while visible. Provider
-          refresh timing and worker health could not be verified. Stocks use
-          simulated data. Unavailable real crypto prices stay unavailable.
-        </p>
-      </div>
-    </aside>
+    <MarketPolicy
+      cryptoMode={status?.cryptoMode ?? ''}
+      cryptoSeconds={0}
+      workerEnabled={false}
+    />
   );
 }

@@ -7,7 +7,10 @@ import {
   type MarketAsset,
 } from '@marketpulse/contracts';
 import { HttpError } from '../../lib/http-error.js';
-import type { MarketSettings } from '../../config/markets.js';
+import {
+  nativeMarketsAllowed,
+  type MarketSettings,
+} from '../../config/markets.js';
 import { budgetWindows } from './engine.js';
 import {
   granularity,
@@ -23,6 +26,10 @@ export function createMarketService(
   activate: () => void = () => {},
   now: () => number = Date.now,
 ) {
+  const allowed = nativeMarketsAllowed(config);
+  const activateIfAllowed = () => {
+    if (allowed) activate();
+  };
   const source = (asset: CatalogAsset): Source =>
     asset.type === 'CRYPTO' && config.CRYPTO_DATA_MODE === 'coinpaprika'
       ? 'COINPAPRIKA'
@@ -65,7 +72,7 @@ export function createMarketService(
             a[query.sort].localeCompare(b[query.sort]) ||
             a.id.localeCompare(b.id),
         );
-      activate();
+      activateIfAllowed();
       return {
         assets: rows
           .slice((query.page - 1) * query.limit, query.page * query.limit)
@@ -77,7 +84,7 @@ export function createMarketService(
     },
     async detail(id: string): Promise<MarketAsset> {
       const row = await asset(id);
-      activate();
+      activateIfAllowed();
       return assetSchema.parse(row);
     },
     async quotes(ids?: string[]) {
@@ -85,6 +92,7 @@ export function createMarketService(
       const unique = ids ? [...new Set(ids)] : all.map((row) => row.id);
       if (unique.some((id) => !all.some((row) => row.id === id)))
         throw new HttpError(404, 'Asset not found');
+      if (!allowed) return { quotes: [] };
       const cached = await store.quotes();
       const states = new Map(
         await Promise.all(
@@ -94,7 +102,7 @@ export function createMarketService(
           ),
         ),
       );
-      activate();
+      activateIfAllowed();
       return {
         quotes: unique.map((id) => {
           const row = all.find((value) => value.id === id)!;
@@ -133,6 +141,11 @@ export function createMarketService(
     },
     async history(id: string, range: HistoryRange) {
       const row = await asset(id);
+      if (!allowed)
+        throw new HttpError(
+          503,
+          'Native price history is unavailable; use the market chart.',
+        );
       const provider = source(row);
       const key = { assetId: id, provider, mode: mode(provider), range };
       let cached = await store.history(key, now());
@@ -148,7 +161,7 @@ export function createMarketService(
         usable = isUsable();
         cacheFresh = usable && (cached?.freshUntil ?? 0) > now();
       }
-      activate();
+      activateIfAllowed();
       const sourceAt = usable
         ? Math.max(...cached!.points.map((point) => point.timestamp))
         : null;

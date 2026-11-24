@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { MarketSettings } from '../../config/markets.js';
+import {
+  nativeMarketsAllowed,
+  type MarketSettings,
+} from '../../config/markets.js';
 import type { MarketProvider } from '../../providers/market-provider.js';
 import {
   MarketDeferred,
@@ -166,6 +169,7 @@ export function createMarketEngine(
       ? 'COINPAPRIKA'
       : 'DEMO';
   async function tick() {
+    if (!nativeMarketsAllowed(settings)) return;
     const assets = await store.assets();
     // Quote batches have priority over chart jobs. Cooldowns persist across restarts.
     for (const provider of providers.values()) {

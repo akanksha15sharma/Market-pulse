@@ -62,7 +62,7 @@ export function MarketDashboardPage() {
           </p>
         </div>
         <span className="catalog-chip">
-          Curated catalog<span>10 crypto · 5 simulated stocks</span>
+          Curated catalog<span>10 cryptocurrencies · 5 stocks</span>
         </span>
       </div>
       {loading && <MarketLoading refreshing={!!data} />}
@@ -227,8 +227,6 @@ export function MarketDashboardPage() {
                                   {quote.provider}
                                 </span>
                               </>
-                            ) : asset.type === 'STOCK' ? (
-                              <DataLabel simulated />
                             ) : (
                               'Source pending'
                             )}

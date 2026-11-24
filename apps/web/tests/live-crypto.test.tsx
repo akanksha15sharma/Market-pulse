@@ -195,7 +195,7 @@ test('watchlists combine real crypto and explicitly simulated stocks without com
   assert.match(html, /DEMO/);
 });
 
-test('live policy exposes chart-only quota exhaustion, source attribution and application budgets', () => {
+test('public policy hides internal budgets and explains unavailable native features', () => {
   const html = renderToStaticMarkup(
     <MarketPolicy
       cryptoMode="coinpaprika"
@@ -204,22 +204,11 @@ test('live policy exposes chart-only quota exhaustion, source attribution and ap
       providers={status.providers}
     />,
   );
-  assert.match(html, /Powered by/);
-  assert.match(html, /Historical charts/);
-  assert.match(html, /budget is exhausted/);
-  assert.match(html, /7999/);
-  assert.match(html, /Stocks remain simulated/);
-  assert.doesNotMatch(html, /Live crypto updates unavailable/);
-  const unavailable = renderToStaticMarkup(
-    <MarketPolicy
-      cryptoMode="coinpaprika"
-      cryptoSeconds={600}
-      workerEnabled
-      providers={[{ ...status.providers[0]!, quoteReason: 'upstream_error' }]}
-    />,
+  assert.match(
+    html,
+    /Native prices and price alerts are currently unavailable/,
   );
-  assert.match(unavailable, /Live crypto updates unavailable/);
-  assert.match(unavailable, /temporarily unavailable/);
+  assert.doesNotMatch(html, /7999|budget|worker|mode selected|simulated/);
 });
 
 test('public schemas reject real/demo provenance mismatches', () => {

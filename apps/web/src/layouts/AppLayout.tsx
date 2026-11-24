@@ -55,8 +55,8 @@ export function AppLayout() {
         <Outlet />
       </main>
       <footer className="mx-auto max-w-6xl px-6 py-8 text-sm text-slate-400">
-        MarketPulse · A software engineering portfolio project. USD only. No
-        trade execution.
+        MarketPulse · Market tracking for informed research. USD only. No trade
+        execution.
       </footer>
     </div>
   );

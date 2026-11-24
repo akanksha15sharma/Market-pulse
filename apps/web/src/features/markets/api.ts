@@ -121,7 +121,11 @@ export async function loadOverview(signal: AbortSignal) {
     readStatus(signal),
   ]);
   validateSelection(catalog.assets, prices.quotes, status?.cryptoMode);
-  return { assets: catalog.assets, quotes: prices.quotes, status };
+  return {
+    assets: catalog.assets,
+    quotes: import.meta.env?.PROD ? [] : prices.quotes,
+    status,
+  };
 }
 export async function loadAsset(id: string, signal: AbortSignal) {
   const [detail, prices, status] = await Promise.all([
@@ -134,7 +138,11 @@ export async function loadAsset(id: string, signal: AbortSignal) {
     readStatus(signal),
   ]);
   validateSelection([detail.asset], prices.quotes, status?.cryptoMode);
-  return { asset: detail.asset, quote: prices.quotes[0], status };
+  return {
+    asset: detail.asset,
+    quote: import.meta.env?.PROD ? undefined : prices.quotes[0],
+    status,
+  };
 }
 
 // Keep range changes and pending polling within the API's six history reads/minute.

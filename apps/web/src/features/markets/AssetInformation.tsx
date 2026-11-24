@@ -60,11 +60,7 @@ export function AssetInformation({ asset }: { asset: MarketAsset }) {
         </div>
         <div>
           <dt>Data availability</dt>
-          <dd>
-            {asset.isDemoOnly
-              ? 'Simulated data only'
-              : 'Real data where available; see chart source'}
-          </dd>
+          <dd>Provider chart; availability and delays vary by instrument</dd>
         </div>
       </dl>
     </section>

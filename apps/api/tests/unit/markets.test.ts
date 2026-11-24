@@ -1138,3 +1138,36 @@ test('one-shot worker refuses disabled ingestion and closes resources on failure
   assert.equal(connections, 1);
   assert.equal(closes, 1);
 });
+
+test('production never reads legacy observations, schedules ingestion, or executes providers', async () => {
+  const fixture = memoryStore();
+  const settings = marketSettingsSchema.parse({
+    NODE_ENV: 'production',
+    CRYPTO_DATA_MODE: 'demo',
+  });
+  let activations = 0;
+  const service = createMarketService(fixture.store, settings, () => {
+    activations++;
+  });
+  assert.deepEqual(await service.quotes(), { quotes: [] });
+  await assert.rejects(
+    service.history(fixture.assets[0]!.id, '1D'),
+    /Native price history is unavailable/,
+  );
+  await service.detail(fixture.assets[0]!.id);
+  assert.equal(activations, 0);
+  let called = false;
+  const provider = {
+    ...demoProvider,
+    quotes: async () => {
+      called = true;
+      return [];
+    },
+  };
+  await createMarketEngine(
+    fixture.store,
+    new Map([['DEMO', provider]]),
+    settings,
+  ).tick();
+  assert.equal(called, false);
+});

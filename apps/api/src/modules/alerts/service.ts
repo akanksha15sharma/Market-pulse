@@ -1,3 +1,4 @@
+import { HttpError } from '../../lib/http-error.js';
 import {
   alertCreateSchema,
   alertSchema,
@@ -8,7 +9,11 @@ import type {
   AlertEvent,
   PrismaClient,
 } from '../../generated/prisma/client.js';
-import { marketSettings, type MarketSettings } from '../../config/markets.js';
+import {
+  marketSettings,
+  nativeMarketsAllowed,
+  type MarketSettings,
+} from '../../config/markets.js';
 import { createAlertRepository, type StoredAlert } from './repository.js';
 function publicEvent(event: AlertEvent) {
   return alertEventSchema.parse({
@@ -38,17 +43,19 @@ export function createAlertService(
       armedAt: alert.armedAt.toISOString(),
       createdAt: alert.createdAt.toISOString(),
       latestEvent: alert.events[0] ? publicEvent(alert.events[0]) : null,
-      eligibility: !alert.asset.isActive
-        ? 'inactive_asset'
-        : alert.asset.type !== 'CRYPTO' ||
-            alert.asset.isDemoOnly ||
-            alert.mode !== 'REAL'
-          ? 'real_data_required'
-          : alert.provider !== 'COINPAPRIKA'
-            ? 'unsupported_source'
-            : settings.CRYPTO_DATA_MODE !== 'coinpaprika'
-              ? 'real_crypto_disabled'
-              : 'eligible',
+      eligibility: !nativeMarketsAllowed(settings)
+        ? 'unsupported_source'
+        : !alert.asset.isActive
+          ? 'inactive_asset'
+          : alert.asset.type !== 'CRYPTO' ||
+              alert.asset.isDemoOnly ||
+              alert.mode !== 'REAL'
+            ? 'real_data_required'
+            : alert.provider !== 'COINPAPRIKA'
+              ? 'unsupported_source'
+              : settings.CRYPTO_DATA_MODE !== 'coinpaprika'
+                ? 'real_crypto_disabled'
+                : 'eligible',
     });
   return {
     async list(userId: string, query: Parameters<typeof repo.list>[1]) {
@@ -67,6 +74,11 @@ export function createAlertService(
       return { ...result, events: result.events.map(publicEvent) };
     },
     async create(userId: string, input: unknown) {
+      if (!nativeMarketsAllowed(settings))
+        throw new HttpError(
+          409,
+          'Price alerts require an authorized native data source. Existing targets are preserved.',
+        );
       return view(await repo.create(userId, alertCreateSchema.parse(input)));
     },
     async edit(userId: string, id: string, input: unknown) {
@@ -76,6 +88,11 @@ export function createAlertService(
       return view(await repo.pause(userId, id));
     },
     async rearm(userId: string, id: string) {
+      if (!nativeMarketsAllowed(settings))
+        throw new HttpError(
+          409,
+          'Price alerts require an authorized native data source.',
+        );
       return view(await repo.rearm(userId, id));
     },
     delete: repo.delete,

@@ -133,7 +133,11 @@ export function AlertsPage() {
               name="assetId"
               required
               disabled={
-                busy || !market.data || state.activeCount >= ALERT_ACTIVE_LIMIT
+                busy ||
+                !market.data?.quotes.some(
+                  (quote) => !quote.simulated && quote.status === 'fresh',
+                ) ||
+                state.activeCount >= ALERT_ACTIVE_LIMIT
               }
               defaultValue=""
             >
@@ -143,7 +147,7 @@ export function AlertsPage() {
               {market.data?.assets.map((asset) => (
                 <option key={asset.id} value={asset.id}>
                   {asset.name} ({asset.symbol})
-                  {asset.type === 'STOCK' ? ' — simulated; cannot trigger' : ''}
+                  {asset.type === 'STOCK' ? ' — native alerts unavailable' : ''}
                 </option>
               ))}
             </select>
@@ -172,14 +176,19 @@ export function AlertsPage() {
           <button
             className="primary-button"
             disabled={
-              busy || !market.data || state.activeCount >= ALERT_ACTIVE_LIMIT
+              busy ||
+              !market.data?.quotes.some(
+                (quote) => !quote.simulated && quote.status === 'fresh',
+              ) ||
+              state.activeCount >= ALERT_ACTIVE_LIMIT
             }
           >
             Save & arm target
           </button>
           <p id="target-help" className="muted">
-            Use a positive decimal with up to 18 fractional digits. Saving a
-            simulated stock target does not enable triggering.
+            Price alerts require an authorized native price source and are
+            currently unavailable. Existing targets remain saved; charts do not
+            trigger alerts.
           </p>
         </fetcher.Form>
       </section>

@@ -2,6 +2,9 @@ import 'dotenv/config';
 import { z } from 'zod';
 const bool = z.enum(['true', 'false']).transform((value) => value === 'true');
 export const marketSettingsSchema = z.object({
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
   CRYPTO_DATA_MODE: z.enum(['demo', 'coinpaprika']).default('coinpaprika'),
   STOCK_DATA_MODE: z.literal('demo').default('demo'),
   MARKET_WORKER_ENABLED: bool.default(true),
@@ -18,3 +21,8 @@ export const marketSettingsSchema = z.object({
 });
 export type MarketSettings = z.infer<typeof marketSettingsSchema>;
 export const marketSettings = marketSettingsSchema.parse(process.env);
+
+// No native provider currently has a verified public-production license.
+// Existing development fixtures remain available without authorizing public use.
+export const nativeMarketsAllowed = (settings: MarketSettings) =>
+  settings.NODE_ENV !== 'production';

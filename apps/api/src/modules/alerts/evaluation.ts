@@ -1,3 +1,4 @@
+import { marketSettings, nativeMarketsAllowed } from '../../config/markets.js';
 import { ALERT_MAX_AGE_MS } from '@marketpulse/contracts';
 import {
   Prisma,
@@ -64,6 +65,7 @@ export async function evaluateQuote(
   tx: Prisma.TransactionClient,
   quote: CachedQuote,
 ) {
+  if (!nativeMarketsAllowed(marketSettings)) return;
   if (quote.provider !== 'COINPAPRIKA' || quote.mode !== 'REAL') return;
   const locked = await tx.$queryRaw<
     { id: string }[]

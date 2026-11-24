@@ -160,10 +160,13 @@ test('price cards and policy persistently identify synthetic stocks and actual p
       workerEnabled={false}
     />,
   );
-  assert.match(policy, /simulated stock data/);
-  assert.match(policy, /coinpaprika.com/);
-  assert.match(policy, /worker is disabled/);
-  assert.match(policy, /10 min/);
+  assert.match(
+    policy,
+    /Native prices and price alerts are currently unavailable/,
+  );
+  assert.doesNotMatch(policy, /CoinPaprika|budget|worker/);
+  assert.match(policy, /not investment advice/);
+  assert.match(policy, /delayed/);
 });
 
 test('flat historical series renders finite geometry, keyboard exploration and exact table values', () => {
@@ -339,8 +342,11 @@ test('optional status failures do not hide valid prices on overview or detail; r
       const html = renderToStaticMarkup(
         <MarketSourcePolicy status={overview.status} />,
       );
-      assert.match(html, /Provider status temporarily unavailable/);
-      assert.match(html, /Stocks use simulated data/);
+      assert.match(html, /Market data information/);
+      assert.match(
+        html,
+        /Native prices and price alerts are currently unavailable/,
+      );
       assert.doesNotMatch(html, /worker is disabled|Real crypto mode selected/);
     }
     globalThis.fetch = async (input) =>
@@ -751,13 +757,13 @@ test('asset information shows catalog facts and clearly identifies simulated sto
     'Stock',
     'NASDAQ',
     'USD',
-    'Simulated data only',
+    'availability and delays vary',
   ]) {
     assert.ok(html.includes(value));
   }
   const real = renderToStaticMarkup(<AssetInformation asset={crypto} />);
   assert.match(real, /Crypto market/);
-  assert.match(real, /Real data where available/);
+  assert.match(real, /Provider chart/);
   assert.doesNotMatch(real, /Simulated data only/);
 });
 
