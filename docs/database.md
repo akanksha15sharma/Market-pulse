@@ -80,6 +80,20 @@ avalanche-2. No network calls, market prices, users, passwords or personal data 
 seeded. Existing user records/transactions are never deleted. isActive is not reset.
 The seed is explicit in Prisma 7, not automatic during migration deploy.
 
+The seed uses a dedicated single-connection pool with 30-second connection and
+query limits. A read-only `SELECT 1` warms the connection before any writes.
+The catalog still runs in one atomic transaction, with an explicit 60-second
+acquisition wait (`maxWait`) and a 120-second runtime limit (`timeout`). The API
+retains its existing 5-second connection and 10-second query limits. These seed
+budgets accommodate Neon activation and network latency; they do not fix invalid
+credentials, network failures, or database locks. Failures propagate without
+automatic retries, and the client disconnects on both success and failure.
+
+The seed still reads `DATABASE_URL`; setting only `DIRECT_DATABASE_URL` does not
+change its target. Never retry production seeding without verifying the target
+and obtaining release approval. A timeout inside the transaction rolls back its
+writes; do not work around it by splitting the seed into independent writes.
+
 ## Local setup
 
 ```sh
