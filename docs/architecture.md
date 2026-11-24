@@ -5,6 +5,15 @@ with an implemented inventory and separately labeled future paths. See
 [public scope](scope.md) and [ADR 0005](decisions/0005-public-product-scope-and-data-rights.md).
 No application, infrastructure, or database change is authorized by this document.
 
+## A2 permission research extension
+
+The [A2 report](provider-permissions-a2.md) recommends official stock and crypto
+embeds for a limited free display release; it does not enable them. The
+[proposed implementation plan](free-data-implementation-plan.md) separates private
+watchlist identity storage from provider-owned displays and gated native feeds.
+The user redefined A2 as research; baseline verification remains a separate pending
+approval. Current adapters, frontend behavior, schema, and deployment are unchanged.
+
 ## Existing stack
 
 MarketPulse is a modular monolith: one backend application organized into separate
@@ -100,7 +109,7 @@ flowchart TD
     API --> Worker[Existing bounded worker]
     Worker --> DB
     Worker --> Current[Existing CoinPaprika and DEMO adapters]
-    Browser -. Future reviewed embed .-> Widget[Official provider-hosted display]
+    Browser -. Future reviewed embed .-> Widget[Official stock and crypto display]
     Worker -. Only with documented no-cost rights .-> Feed[Approved native stock dataset]
     Widget -. Display only .-> Limit[No widget extraction or backend stock alerts]
 ```
@@ -123,5 +132,5 @@ Mailpit. A table or planned diagram is not proof that a feature works for users.
 Preserve Vercel frontend, Render API, Neon PostgreSQL, relative API requests, and
 current secrets. Do not provision a paid worker or change scheduler activation.
 Free hosts can sleep or suspend at usage limits; durable state remains in PostgreSQL.
-See [free deployment constraints](free-deployment.md). A2 will verify the baseline
-only after separate approval; A1 records direction without changing runtime behavior.
+See [free deployment constraints](free-deployment.md). A2 records permission
+research only; baseline verification and implementation still need explicit approval.

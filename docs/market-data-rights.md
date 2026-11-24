@@ -70,7 +70,7 @@ flowchart TD
 Passing the rights check does not itself authorize code changes or a deployment.
 The user still approves each implementation step and any production data operation.
 
-## Initial record status
+## A1 baseline record and A2 update
 
 | Use                                                    | A1 status                         | What remains required                                                                               |
 | ------------------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -81,7 +81,15 @@ The user still approves each implementation step and any production data operati
 | Widget-derived backend cache or alerts                 | Excluded                          | Widgets provide no approval to extract observations                                                 |
 | Isolated test fixtures                                 | Allowed for software tests        | Never present them as production observations                                                       |
 
-See dated primary evidence in [provider findings](data-providers.md). A1 changes no
+A2 extends this baseline with [dated evidence](provider-permissions-a2.md). Official
+stock/crypto embeds are recommended for display only, pending site/symbol checks.
+CoinMarketCap Basic now has verified advertised free commercial-use rights, but the
+operative agreement, retention, historical endpoint scope, and alerts are unconfirmed.
+CoinLore and Coinbase were reviewed without clearing a public native grant. No
+provider has been enabled or granted MarketPulse-specific permission by this research.
+The user redefined A2 as documentation-only permission research, not baseline execution.
+
+See dated primary evidence in [provider findings](data-providers.md). A1/A2 change no
 current deployment: an unresolved licensing gate is documented for a future approved
 release decision, not treated as permission to switch off a live integration now.
 
@@ -142,3 +150,16 @@ snapshots, resolve the retention design before accepting that source.
 
 Recheck evidence before first enablement, provider/plan changes, monetization,
 new exchanges, new export or alert features, and after a published terms change.
+
+## Evidence quality after A2
+
+Label each source fact V (verified), R (restricted), or U (unconfirmed) as defined
+in the [A2 report](provider-permissions-a2.md). A marketing permission statement
+can be verified while an account-specific grant remains unresolved. An inaccessible
+terms URL or indexed excerpt is not a substitute for the operative agreement.
+Do not read an internal non-display grant as permission for our public display.
+
+When sources conflict, record both and keep the affected capability unavailable
+for release until resolved. Do not label a provider permanently prohibited merely
+because our research cannot confirm a grant. No provider contact is authorized by
+this checklist. Implementation and production enablement remain separate approvals.

@@ -3,18 +3,23 @@
 For current setup, supported features, screenshots guidance, and checks, start
 with the [project README](../README.md).
 
-## Approved public-product direction — Step A1
+## Approved public-product direction — documentation steps A1 and A2
 
 These documents distinguish implemented behavior from the intended public release:
 
+- [A2 provider permission research, evidence labels, and recommendation](provider-permissions-a2.md)
+- [Proposed free-data implementation steps and diagrams](free-data-implementation-plan.md)
+- [ADR 0006: A2 research boundary and follow-up](decisions/0006-a2-provider-permission-review.md)
 - [Public product scope and launch gates](scope.md)
 - [Current architecture and proposed data paths](architecture.md)
 - [Dated provider findings](data-providers.md)
 - [Market-data rights acceptance checklist](market-data-rights.md)
 - [ADR 0005: scope, cost boundary, and approval sequence](decisions/0005-public-product-scope-and-data-rights.md)
 
-A1 is documentation only. It approves neither a provider integration nor A2,
-production seeding, migrations, deployment, or paid services.
+A1 and the user-defined A2 permission review are documentation only. A2 does not
+execute the previously proposed baseline activity. Neither step approves a provider
+integration, production seeding, migrations, deployment, paid services, or the next
+implementation step.
 
 ## Current operational and feature guides
 

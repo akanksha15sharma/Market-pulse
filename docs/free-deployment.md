@@ -1,6 +1,13 @@
 # A $0 MarketPulse deployment plan
 
-## A1 public-product boundary — 2026-11-25
+## A1/A2 public-product boundary — 2026-11-25
+
+The [A2 permission report](provider-permissions-a2.md) recommends an official
+stock/crypto embed path and separately gated native data. The
+[implementation proposal](free-data-implementation-plan.md) requires a new approval.
+This is research only: leave current routing, provider configuration, secrets,
+billing, schema, and scheduler settings untouched. No account or runtime baseline
+was verified as part of A2.
 
 [Public scope](scope.md), [provider findings](data-providers.md), and the
 [rights checklist](market-data-rights.md) supersede any implication below that

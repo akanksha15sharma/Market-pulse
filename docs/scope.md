@@ -1,6 +1,9 @@
 # MarketPulse public product scope
 
-Decision date: 2026-11-25. Step A1 is approved for documentation only.
+Decision date: 2026-11-25. Steps A1 and A2 are approved for documentation only.
+The [A2 report](provider-permissions-a2.md) and
+[implementation proposal](free-data-implementation-plan.md) extend this scope
+without changing the running product.
 [ADR 0005](decisions/0005-public-product-scope-and-data-rights.md) supersedes the
 original demonstration scope. This document defines the intended public product;
 it does not claim that the changes below are deployed.
@@ -73,7 +76,7 @@ A widget is a small provider-hosted component embedded in the page. Its displaye
 price does not become a value our server may copy. A native feed is data fetched
 by our server, which needs its own permissions and limits.
 
-Prefer investigating official free stock widgets first. This is a direction for
+Prefer investigating official free stock and crypto widgets first. This is a direction for
 later review, not approval of a provider, widget implementation, or data ingestion.
 A fully integrated stock feed remains conditional; no reviewed standard free plan
 has yet been accepted for all required public display, caching, charts, and alerts.
@@ -138,5 +141,8 @@ No trade execution, simulated portfolio product, predictions, full-market search
 paid market feed, guaranteed timing, or unlimited-scale promise is included.
 Do not migrate users or replace the working hosting stack as part of A1.
 
-Next: A2 establishes the existing release baseline and acceptance evidence.
-It requires separate approval. A1 authorizes no A2 implementation or deployment.
+The user defined A2 as permission research; that documentation step supersedes the
+previous proposal to execute baseline verification as A2. Baseline verification and
+the next implementation step remain pending explicit approval. Consult
+[ADR 0006](decisions/0006-a2-provider-permission-review.md). Neither A1 nor A2
+authorizes application changes, a production data operation, or a deployment.

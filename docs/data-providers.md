@@ -1,21 +1,39 @@
 # Provider findings for the public MarketPulse product
 
-Primary public sources reviewed 2026-11-24 through 2026-11-25 for Step A1. No account was created,
+A1 sources reviewed 2026-11-24 through 2026-11-25; extended by the documentation-only
+A2 permission review on 2026-11-25. No account was created,
 provider contacted, key issued, credentialed API tested, or integration enabled.
 This replaces the original provider-selection proposal. The implemented crypto
 adapter is CoinPaprika, not CoinGecko. Stocks still use DEMO in current code.
 
+## A2 research update
+
+The [dated A2 report](provider-permissions-a2.md) is the current detailed evidence
+record. It distinguishes verified statements, restrictions, and unknown permissions.
+The user defined A2 as research, superseding the earlier proposed baseline activity.
+No baseline execution, provider registration, or integration is completed here.
+
+Recommend official stock **and crypto** widgets for a constrained free display
+release, subject to site and symbol review. CoinMarketCap Basic is a promising
+native-crypto clarification candidate because its current pricing advertises free
+commercial use; operative terms, retention, history, and alerts remain unconfirmed.
+CoinLore API availability and Coinbase public endpoints do not establish our rights.
+See the [proposed step-by-step plan](free-data-implementation-plan.md) before asking
+for a new implementation approval. No provider is enabled or cleared for the full
+native feature set by A2.
+
 ## Decision
 
 Prioritize genuine, permitted observations and keep all work within free allowances.
-Investigate official free stock widgets for display first. Do not select a native
-stock API until its exact plan permits our public display, caching, history, and
+Investigate official free stock and crypto widgets for display first. Do not select
+a native stock API until its exact plan permits our public display, caching, history, and
 server-side alerts. Existing crypto rights require the same review.
 
 A free endpoint is an access mechanism, not a public redistribution license.
 Likewise, attribution, delaying a price, batching requests, or caching it does not
 supply missing permission. Read the [rights checklist](market-data-rights.md) before
-any implementation decision. No complete native provider is approved by A1.
+any implementation decision. No complete native provider is approved by A1 or
+this A2 documentation review.
 
 ## Evidence register
 
