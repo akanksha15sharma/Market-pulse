@@ -21,6 +21,14 @@ execute the previously proposed baseline activity. Neither step approves a provi
 integration, production seeding, migrations, deployment, paid services, or the next
 implementation step.
 
+## A3 verification baseline
+
+Read the [A3 verification report](verification-a3.md) for commands, diagrams, live
+read-only checks, browser tests, and evidence limits. The 119 non-database tests
+pass; all five database integration suites are blocked by unavailable local
+PostgreSQL. Live readiness succeeds but does not verify persistence, migrations,
+or catalog contents. No implementation or production data/settings change was made.
+
 ## Current operational and feature guides
 
 - [Free hosting comparison, provider limits, and opt-in background alerts](free-deployment.md)
