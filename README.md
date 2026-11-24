@@ -1,28 +1,24 @@
 # MarketPulse
 
-A responsive cryptocurrency and stock market tracker built with React 19, TypeScript,
-Vite, Express 5, Prisma 7, and PostgreSQL 17. Prices are in USD. This is a portfolio
-project, with explicit source, freshness, and simulation labels throughout.
+A public cryptocurrency and stock market tracker built with React 19, TypeScript,
+Vite, Express 5, Prisma 7 and PostgreSQL 17. Production market displays use official
+TradingView widgets with attribution, explicit instruments and feed-delay disclosures.
+Native prices and price alerts are unavailable pending an authorized free source.
+Existing accounts, watchlists, asset IDs and alert records are preserved.
 
-The approved [A1 public-product scope](docs/scope.md) prioritizes genuine, permitted
-data and a completely free release. Current simulated stocks and unresolved provider
-rights are documented there as implementation/release gaps, not completed changes.
-See the [licensing checklist](docs/market-data-rights.md) before public expansion.
-A1 updates documentation only and does not authorize the next implementation step.
+See the [B–D implementation and deployment report](docs/implementation-bcd.md) for
+current behavior, verified permissions, test results, limitations and rollout steps.
+A1–A3 documents remain historical scope, research and baseline evidence.
 
 ## Features
 
-- **Markets:** 10 curated cryptocurrencies and 5 stocks, price cards, search, type
+- **Markets:** 10 curated cryptocurrencies and 5 stocks, official market overview, search, type
   filters, and sorting. Star favorites and filter them; favorites stay in this
   browser through refreshes using localStorage.
-- **Asset details:** catalog information and interactive historical charts with
-  pointer exploration, a keyboard slider, exact-value tables, range statistics,
-  and **24H, 7D, 30D, 1Y** filters.
+- **Asset details:** catalog information and official interactive TradingView historical charts. Source availability, market sessions and delays vary by instrument.
 - **Private watchlists:** create, rename, and delete up to five account-owned lists,
   with up to 20 assets each. Saved in PostgreSQL, separate from browser favorites.
-- **Price alerts:** private USD targets, pause/rearm controls, and target-reached
-  history. Only fresh, post-arm real CoinPaprika observations can trigger them.
-  Stock targets remain blocked while stocks are simulated.
+- **Price alerts:** saved targets and history remain manageable; production creation, rearming and evaluation are blocked until native data rights are verified.
 - **Accounts:** registration, sign-in, session revocation, signed CSRF tokens,
   password hashing, validation, ownership checks, and persistent rate limits.
 - **Reliable data presentation:** cached observations remain visible during refresh
@@ -209,5 +205,5 @@ the implemented environment contract.
 
 Akanksha Sharma — [GitHub](https://github.com/akanksha15sharma).
 
-MarketPulse is an educational portfolio project. Market data can be delayed,
-unavailable, cached, or simulated. It does not provide investment advice or execute trades.
+MarketPulse provides informational market tracking. Public displays can be delayed
+or unavailable; native data and alerts require verified provider permissions. It does not provide investment advice or execute trades.

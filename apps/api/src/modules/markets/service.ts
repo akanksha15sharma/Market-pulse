@@ -1,5 +1,6 @@
 import {
   assetSchema,
+  publicMarketCapabilities,
   historySourceMaxAge,
   historyResponseSchema,
   quoteSchema,
@@ -203,6 +204,18 @@ export function createMarketService(
       return { status: usable ? 200 : 202, body: result };
     },
     async status() {
+      if (!allowed)
+        return {
+          capabilities: publicMarketCapabilities,
+          cryptoMode: config.CRYPTO_DATA_MODE,
+          stockMode: 'demo' as const,
+          refreshSeconds: { crypto: 600, stocks: 60 },
+          workerEnabled: false,
+          alwaysOn: false,
+          attribution:
+            'Market displays by TradingView. Native data unavailable.',
+          providers: [],
+        };
       const providers = await Promise.all(
         (['DEMO', 'COINPAPRIKA'] as const).map(async (provider) => {
           const state = await store.state(provider);

@@ -106,10 +106,13 @@ export function WatchlistAssets({
                   ) : (
                     <>
                       <span className="muted">Price unavailable</span>
-                      {asset.type === 'STOCK' && (
-                        <span className="source-name block muted">
-                          Simulated stock data
-                        </span>
+                      {available && (
+                        <Link
+                          className="source-name block"
+                          to={`/assets/${asset.id}`}
+                        >
+                          Open market chart
+                        </Link>
                       )}
                     </>
                   )}

@@ -1145,6 +1145,15 @@ test('production never reads legacy observations, schedules ingestion, or execut
     NODE_ENV: 'production',
     CRYPTO_DATA_MODE: 'demo',
   });
+  fixture.store.quotes = async () => {
+    throw new Error('Legacy cache must not be read');
+  };
+  fixture.store.history = async () => {
+    throw new Error('Legacy history must not be read');
+  };
+  fixture.store.enqueue = async () => {
+    throw new Error('No production job may be queued');
+  };
   let activations = 0;
   const service = createMarketService(fixture.store, settings, () => {
     activations++;
@@ -1170,4 +1179,34 @@ test('production never reads legacy observations, schedules ingestion, or execut
     settings,
   ).tick();
   assert.equal(called, false);
+});
+
+test('production capabilities never advertise native features or expose quotas', async () => {
+  const fixture = memoryStore();
+  const service = createMarketService(
+    fixture.store,
+    marketSettingsSchema.parse({ NODE_ENV: 'production' }),
+  );
+  const status = await service.status();
+  assert.equal(status.capabilities?.nativePrices, false);
+  assert.equal(status.capabilities?.nativePriceAlerts, false);
+  assert.equal(status.workerEnabled, false);
+  assert.deepEqual(status.providers, []);
+});
+
+test('production one-shot worker never opens a database or runs ingestion', async () => {
+  const { runMarketOnce } =
+    await import('../../src/modules/markets/run-once.js');
+  let connected = false;
+  await assert.rejects(
+    runMarketOnce(
+      marketSettingsSchema.parse({ NODE_ENV: 'production' }),
+      () => {
+        connected = true;
+        return { tick: async () => {}, disconnect: async () => {} };
+      },
+    ),
+    /No authorized production native data source/,
+  );
+  assert.equal(connected, false);
 });

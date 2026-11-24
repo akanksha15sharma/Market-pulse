@@ -1,4 +1,4 @@
-import { marketSettings } from '../config/markets.js';
+import { marketSettings, nativeMarketsAllowed } from '../config/markets.js';
 import { createDatabaseClient } from '../db/client.js';
 import { createMarketRepository } from '../modules/markets/repository.js';
 import { createMarketService } from '../modules/markets/service.js';
@@ -7,6 +7,13 @@ import { MarketDeferred } from '../modules/markets/types.js';
 
 // Read-only preflight: no provider request, worker activation, reservation or reset.
 async function check() {
+  if (!nativeMarketsAllowed(marketSettings)) {
+    console.error(
+      'Native production market data is unavailable pending verified provider permissions. Use official market displays.',
+    );
+    process.exitCode = 1;
+    return;
+  }
   if (marketSettings.CRYPTO_DATA_MODE !== 'coinpaprika') {
     console.error(
       'Crypto is in demo mode. See docs/live-crypto.md to select CoinPaprika.',

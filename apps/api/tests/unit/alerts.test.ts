@@ -1,3 +1,6 @@
+import { marketSettingsSchema } from '../../src/config/markets.js';
+import { createAlertService } from '../../src/modules/alerts/service.js';
+import type { PrismaClient } from '../../src/generated/prisma/client.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
@@ -461,4 +464,19 @@ test('alert rate limits and internal failures are safe uncached errors', async (
   const failed = await fixture({ fail: true }).call('GET', '/api/v1/alerts');
   assert.equal(failed.status, 500);
   assert.ok(!JSON.stringify(failed.body).includes('PRIVATE_DATABASE_URL'));
+});
+
+test('production rejects alert creation and rearming before accessing database records', async () => {
+  const service = createAlertService(
+    {} as PrismaClient,
+    marketSettingsSchema.parse({ NODE_ENV: 'production' }),
+  );
+  await assert.rejects(
+    service.create(randomUUID(), {}),
+    /authorized native data source/,
+  );
+  await assert.rejects(
+    service.rearm(randomUUID(), randomUUID()),
+    /authorized native data source/,
+  );
 });

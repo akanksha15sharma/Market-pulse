@@ -1,3 +1,4 @@
+import { publicMarketCapabilitiesSchema } from './market-capabilities.js';
 import { z } from 'zod';
 
 export const historyRangeSchema = z.enum(['1D', '7D', '1M', '1Y']);
@@ -108,6 +109,7 @@ export const marketProviderStatusSchema = z.object({
   ),
 });
 export const marketStatusSchema = z.object({
+  capabilities: publicMarketCapabilitiesSchema.optional(),
   cryptoMode: z.enum(['demo', 'coinpaprika']),
   stockMode: z.literal('demo'),
   refreshSeconds: z.object({

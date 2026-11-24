@@ -1,5 +1,7 @@
 # MarketPulse architecture and public-product direction
 
+> Production B–D update: official TradingView displays are isolated from the backend. Native public ingestion and price alerts are disabled pending verified rights. See [the implementation report](implementation-bcd.md) for the current diagram and rollout. Earlier provider details below describe retained development internals.
+
 Reviewed 2026-11-25 for Step A1. This replaces the original architecture proposal
 with an implemented inventory and separately labeled future paths. See
 [public scope](scope.md) and [ADR 0005](decisions/0005-public-product-scope-and-data-rights.md).

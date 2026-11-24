@@ -76,15 +76,12 @@ export function AlertsPage() {
           i
         </span>
         <div>
-          <strong>Real prices only.</strong> Simulated, stale, future or pre-arm
-          observations never trigger alerts. Stocks currently use demo data:
-          stock targets can be saved and managed, but remain blocked from
-          triggering.
+          <strong>Price alerts are currently unavailable.</strong> Existing
+          targets and their history remain saved.
           <p>
-            If a target is already satisfied, the next eligible real observation
-            after arming may trigger it. Evaluation requires the market worker
-            to be running; sleeping hosts can miss observations. No missed
-            crossings are reconstructed.
+            Alerts need an authorized native data source. TradingView charts are
+            for display only and cannot trigger MarketPulse alerts. You can
+            manage or pause saved targets.
           </p>
         </div>
       </aside>
@@ -295,7 +292,8 @@ export function AlertsPage() {
                         disabled={
                           busy ||
                           (alert.status !== 'ACTIVE' &&
-                            state.activeCount >= ALERT_ACTIVE_LIMIT)
+                            (alert.eligibility !== 'eligible' ||
+                              state.activeCount >= ALERT_ACTIVE_LIMIT))
                         }
                       >
                         {alert.status === 'ACTIVE' ? 'Pause' : 'Arm again'}

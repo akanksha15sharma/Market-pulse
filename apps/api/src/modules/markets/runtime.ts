@@ -1,5 +1,9 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
-import { marketSettings, type MarketSettings } from '../../config/markets.js';
+import {
+  marketSettings,
+  nativeMarketsAllowed,
+  type MarketSettings,
+} from '../../config/markets.js';
 import { createDatabaseMarketEngine } from './engine-factory.js';
 import { createMarketService } from './service.js';
 
@@ -29,7 +33,12 @@ export function createMarketRuntime(
       });
   };
   function activate() {
-    if (!settings.MARKET_WORKER_ENABLED || stopped) return;
+    if (
+      !nativeMarketsAllowed(settings) ||
+      !settings.MARKET_WORKER_ENABLED ||
+      stopped
+    )
+      return;
     activeUntil = Date.now() + 10 * 60_000;
     if (!timer) {
       timer = setInterval(() => {

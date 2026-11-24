@@ -19,6 +19,17 @@ const asset = {
   quoteCurrency: 'USD',
   isDemoOnly: true,
 };
+const cryptoId = '00000000-0000-4000-8000-000000000002';
+const cryptoAsset = {
+  ...asset,
+  id: cryptoId,
+  key: 'crypto:bitcoin',
+  symbol: 'BTC',
+  name: 'Bitcoin',
+  type: 'CRYPTO',
+  exchange: null,
+  isDemoOnly: false,
+};
 const requests = [];
 const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
@@ -26,10 +37,12 @@ const server = http.createServer(async (req, res) => {
     requests.push(path);
     const body =
       path === '/api/v1/assets'
-        ? { assets: [asset], total: 1 }
+        ? { assets: [asset, cryptoAsset], total: 2 }
         : path === `/api/v1/assets/${id}`
           ? { asset }
-          : { error: 'Unexpected native request' };
+          : path === `/api/v1/assets/${cryptoId}`
+            ? { asset: cryptoAsset }
+            : { error: 'Unexpected native request' };
     res.writeHead('error' in body ? 500 : 200, {
       'Content-Type': 'application/json',
     });
@@ -74,7 +87,8 @@ const chrome = spawn(
 );
 let sequence = 0,
   buffer = '',
-  blocked = true;
+  blocked = true,
+  silent = false;
 const pending = new Map(),
   exceptions = [],
   results = [];
@@ -134,7 +148,11 @@ chrome.stdio[4].on('data', (chunk) => {
               responseHeaders: [
                 { name: 'Content-Type', value: 'text/javascript' },
               ],
-              body: Buffer.from(fixture).toString('base64'),
+              body: Buffer.from(
+                silent
+                  ? '/* Loaded script without a frame: timeout fixture. */'
+                  : fixture,
+              ).toString('base64'),
             },
             message.sessionId,
           );
@@ -146,7 +164,7 @@ const deadline = setTimeout(() => {
   chrome.kill('SIGKILL');
   server.close();
   process.exitCode = 1;
-}, 55000);
+}, 85000);
 try {
   const target = await send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await send('Target.attachToTarget', {
@@ -173,7 +191,7 @@ try {
       )
     ).result.value;
   async function until(expression) {
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 260; i++) {
       if (await evaluate(expression)) return;
       await new Promise((done) => setTimeout(done, 100));
     }
@@ -252,10 +270,57 @@ try {
       horizontalOverflow: false,
     });
   }
+  silent = true;
+  await send(
+    'Page.navigate',
+    { url: `http://127.0.0.1:${port}/markets` },
+    sessionId,
+  );
+  await until("document.body.innerText.includes('could not be loaded')");
+  results.push({ loadedScriptWithoutFrame: 'timeout fallback passed' });
+  if (process.env.MARKET_BROWSER_LIVE_WIDGETS === '1') {
+    await send('Fetch.disable', {}, sessionId);
+    for (const [label, path] of [
+      ['overview', '/markets'],
+      ['stock', `/assets/${id}`],
+      ['crypto', `/assets/${cryptoId}`],
+    ]) {
+      await send(
+        'Page.navigate',
+        { url: `http://127.0.0.1:${port}${path}` },
+        sessionId,
+      );
+      await until(
+        "!!document.querySelector('iframe') || document.body.innerText.includes('could not be loaded')",
+      );
+      await new Promise((done) => setTimeout(done, 4000));
+      const live = await evaluate(
+        "JSON.stringify({framePresent:!!document.querySelector('iframe'),busy:document.querySelector('.tradingview-widget-container')?.getAttribute('aria-busy'),fallback:document.body.innerText.includes('could not be loaded')})",
+      );
+      const shot = await send(
+        'Page.captureScreenshot',
+        { format: 'png' },
+        sessionId,
+      );
+      await writeFile(
+        join(artifacts, `live-${label}.png`),
+        Buffer.from(shot.data, 'base64'),
+      );
+      results.push({
+        display: label,
+        actualProviderShell: JSON.parse(live),
+        note: 'No financial data was read from the frame. Inspect screenshot; symbol/feed delivery is not inferred from iframe presence.',
+      });
+    }
+  }
+
   assert.deepEqual(exceptions, []);
   assert.ok(
     requests.every(
-      (path) => path === '/api/v1/assets' || path === `/api/v1/assets/${id}`,
+      (path) =>
+        path === '/api/v1/assets' ||
+        path === `/api/v1/assets/${id}` ||
+        path === `/api/v1/assets/${cryptoId}`,
     ),
     'Production UI requested native data',
   );
@@ -267,7 +332,9 @@ try {
         exceptions,
         artifacts,
         limitation:
-          'Embedded shells are mocked. Real third-party data delivery and chart controls require separate browser verification.',
+          process.env.MARKET_BROWSER_LIVE_WIDGETS === '1'
+            ? 'Failure tests use mocked shells; optional real official frames are captured separately. Iframe presence does not verify feed accuracy or every symbol entitlement.'
+            : 'Embedded shells are mocked. Real third-party data delivery and chart controls require separate browser verification.',
       },
       null,
       2,

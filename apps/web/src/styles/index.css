@@ -1189,3 +1189,23 @@ html[data-theme='light'] .market-error {
     align-items: center;
   }
 }
+html[data-theme='light'] .asset-symbol,
+html[data-theme='light'] .catalog-results,
+html[data-theme='light'] .catalog-chip span,
+html[data-theme='light'] .section-heading span,
+html[data-theme='light'] .panel-heading p,
+html[data-theme='light'] .panel-footnote,
+html[data-theme='light'] .asset-information dt,
+html[data-theme='light'] .quote-notice {
+  color: #475569;
+}
+html[data-theme='light'] .text-slate-100,
+html[data-theme='light'] .text-slate-200 {
+  color: #0f172a;
+}
+html[data-theme='light'] .bg-slate-900 {
+  background: #ffffff;
+}
+html[data-theme='light'] .bg-slate-800 {
+  background: #e2e8f0;
+}

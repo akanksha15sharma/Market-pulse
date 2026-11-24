@@ -8,7 +8,7 @@ export function AlertEligibility({ alert }: { alert: AlertView }) {
       'Blocked: real crypto mode is disabled. Demo prices can never trigger this alert.',
     inactive_asset: 'Blocked: this asset is no longer in the active catalog.',
     unsupported_source:
-      'Blocked: the saved data source is no longer supported. Create a new alert for this asset.',
+      'Price alerts require an authorized native data source. This target remains saved; chart displays cannot trigger it.',
     eligible:
       'Only a fresh real CoinPaprika observation recorded after arming can trigger this alert.',
   };
@@ -42,7 +42,13 @@ export function AlertEventHistory({ events }: { events: AlertEventView[] }) {
           </div>
           <p>
             Observed{' '}
-            <strong className="alert-decimal">USD {event.observedPrice}</strong>
+            {event.verifiedReal ? (
+              <strong className="alert-decimal">
+                USD {event.observedPrice}
+              </strong>
+            ) : (
+              'price unavailable — source not verified'
+            )}
             {event.targetPrice && (
               <>
                 {' '}

@@ -1,6 +1,9 @@
-import { marketSettings } from './config/markets.js';
+import { marketSettings, nativeMarketsAllowed } from './config/markets.js';
 import { createDatabaseClient } from './db/client.js';
 import { createMarketRuntime } from './modules/markets/runtime.js';
+
+if (!nativeMarketsAllowed(marketSettings))
+  throw new Error('No authorized production native data source');
 
 if (!marketSettings.MARKET_ALWAYS_ON || !marketSettings.MARKET_WORKER_ENABLED)
   throw new Error(

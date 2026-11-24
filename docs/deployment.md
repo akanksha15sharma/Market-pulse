@@ -1,5 +1,7 @@
 # Deployment runbook
 
+> B–D update: use the [implementation report](implementation-bcd.md) for current public display behavior, native-data restrictions, verification results and safe rollout. No migration or production seed is required. Earlier demo/worker instructions below do not authorize native production ingestion.
+
 This runbook describes the implemented application as reviewed on 2026-11-23.
 No hosting resources have been provisioned, migrations applied, or deployment
 performed during production preparation. Hosting-specific values must be selected

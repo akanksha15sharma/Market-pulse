@@ -1,3 +1,7 @@
+import {
+  publicMarketCapabilities,
+  publicMarketCapabilitiesSchema,
+} from '@marketpulse/contracts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -84,4 +88,15 @@ test('display preserves attribution, loading state and accurate limitations befo
   assert.match(html, /delayed or alternative/);
   assert.match(html, /not used for MarketPulse price alerts/);
   assert.doesNotMatch(html, /Simulated|105\.00|7999|API key/);
+});
+
+test('public capabilities cannot claim unverified native data or alert support', () => {
+  assert.equal(
+    publicMarketCapabilitiesSchema.safeParse({
+      ...publicMarketCapabilities,
+      nativePriceAlerts: true,
+    }).success,
+    false,
+  );
+  assert.equal(publicMarketCapabilities.nativeHistory, false);
 });

@@ -1,4 +1,7 @@
-import type { MarketSettings } from '../../config/markets.js';
+import {
+  nativeMarketsAllowed,
+  type MarketSettings,
+} from '../../config/markets.js';
 import { createDatabaseClient } from '../../db/client.js';
 import { createDatabaseMarketEngine } from './engine-factory.js';
 
@@ -17,6 +20,8 @@ export async function runMarketOnce(
     return { tick: engine.tick, disconnect: () => db.$disconnect() };
   },
 ) {
+  if (!nativeMarketsAllowed(settings))
+    throw new Error('No authorized production native data source');
   if (!settings.MARKET_WORKER_ENABLED)
     throw new Error('A market batch requires MARKET_WORKER_ENABLED=true');
   const connection = connect();

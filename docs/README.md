@@ -1,5 +1,7 @@
 # MarketPulse documentation
 
+> B–D update: use the [implementation report](implementation-bcd.md) for current public display behavior, native-data restrictions, verification results and safe rollout. No migration or production seed is required. Earlier demo/worker instructions below do not authorize native production ingestion.
+
 For current setup, supported features, screenshots guidance, and checks, start
 with the [project README](../README.md).
 

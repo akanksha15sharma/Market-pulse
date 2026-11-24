@@ -253,7 +253,7 @@ export function WatchlistsPage() {
                 <div className="panel-heading">
                   <div>
                     <h2 id="add-assets-heading">Make it your market.</h2>
-                    <p>Add crypto and simulated stocks to {selected.name}.</p>
+                    <p>Add cryptocurrencies and stocks to {selected.name}.</p>
                   </div>
                 </div>
                 <div className="catalog-toolbar">

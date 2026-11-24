@@ -276,6 +276,8 @@ test('trigger history retains exact target/source snapshots and distinguishes un
     />,
   );
   assert.match(legacy, /Legacy event/);
+  assert.doesNotMatch(legacy, /101\.000000000000000001/);
+  assert.match(legacy, /price unavailable/);
   assert.doesNotMatch(legacy, /<strong>Target reached/);
   assert.match(
     renderToStaticMarkup(<AlertEventHistory events={[]} />),
@@ -315,7 +317,8 @@ test('responsive alert page has labeled forms, active capacity, blocked stock gu
     assert.match(html, /Save changes &amp; pause/);
     assert.match(html, /Delete alert/);
     assert.match(html, /Blocked: simulated data/);
-    assert.match(html, /never trigger alerts/);
+    assert.match(html, /Price alerts are currently unavailable/);
+    assert.match(html, /cannot trigger MarketPulse alerts/);
     assert.match(html, /One event per activation/);
   } finally {
     router.dispose();
