@@ -3,7 +3,7 @@
 > B–D update: use the [implementation report](implementation-bcd.md) for current public display behavior, native-data restrictions, verification results and safe rollout. No migration or production seed is required. Earlier demo/worker instructions below do not authorize native production ingestion.
 
 For current setup, supported features, screenshots guidance, and checks, start
-with the [project README](../README.md).
+with the [project README](../README.md). See the [widget layout and catalog-loading correction](widget-layout-fix.md) for the visibility regression checks and retry behavior.
 
 ## Approved public-product direction — documentation steps A1 and A2
 

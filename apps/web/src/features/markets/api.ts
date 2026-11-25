@@ -41,11 +41,32 @@ async function read<T>(
       'Request limit reached. Refresh will resume automatically.',
       readBlockedUntil - Date.now(),
     );
-  const response = await fetch(`/api/v1${path}`, {
-    credentials: 'same-origin',
-    cache: 'no-store',
-    signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-  });
+  // Catalog metadata can arrive slowly when the free service is waking up.
+  // This does not change provider requests, native data access or server limits.
+  const catalogRead = /^\/assets(?:\/[^/?]+)?$/.test(path.split('?')[0]!);
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: AbortSignal.any([
+        signal,
+        AbortSignal.timeout(catalogRead ? 45_000 : 10_000),
+      ]),
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (
+      catalogRead &&
+      error instanceof Error &&
+      ['TimeoutError', 'TypeError'].includes(error.name)
+    )
+      throw new MarketRequestError(
+        'Market information could not be loaded. Retrying automatically; you can also try again.',
+        5_000,
+      );
+    throw error;
+  }
   if (!response.ok) {
     if (response.status === 429) {
       readBlockedUntil =
@@ -73,6 +94,13 @@ async function read<T>(
         'Market API route is unavailable. Please try again later.',
       );
     }
+    if (catalogRead && response.status >= 500)
+      throw new MarketRequestError(
+        'Market information is temporarily unavailable. Retrying automatically; you can also try again.',
+        response.headers.has('Retry-After')
+          ? retryDelay(response.headers.get('Retry-After'))
+          : 5_000,
+      );
     throw new MarketRequestError(
       'Market data is temporarily unavailable. Please try again.',
     );

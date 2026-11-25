@@ -108,8 +108,8 @@ export function MarketLoading({
     >
       <span className="loading-bar" aria-hidden="true" />
       {refreshing
-        ? 'Refreshing cached observations…'
-        : 'Loading the latest cached observations…'}
+        ? 'Refreshing market information…'
+        : 'Loading market information… This may take a moment.'}
     </div>
   );
 }

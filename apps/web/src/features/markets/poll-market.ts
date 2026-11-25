@@ -17,6 +17,7 @@ export function pollMarket<T>(
   let running = false;
   let blockedUntil = 0;
   let data: T | null = null;
+  let failures = 0;
   async function run() {
     clearTimeout(timer);
     if (visibility.hidden || running || controller.signal.aborted) return;
@@ -25,15 +26,25 @@ export function pollMarket<T>(
       return;
     }
     running = true;
+    let failed = false;
     try {
       start();
       data = await request(controller.signal);
+      failures = 0;
+      blockedUntil = 0;
       if (!controller.signal.aborted) receive(data);
     } catch (error) {
       if (!controller.signal.aborted) {
-        blockedUntil =
-          Date.now() +
-          (error instanceof MarketRequestError ? error.retryMs : 60_000);
+        failed = true;
+        failures++;
+        const minimum =
+          error instanceof MarketRequestError ? error.retryMs : 60_000;
+        // Short transient retries back off to one minute; Retry-After is never shortened.
+        const backoff =
+          minimum < 60_000
+            ? Math.min(60_000, minimum * 2 ** Math.min(failures - 1, 4))
+            : minimum;
+        blockedUntil = Date.now() + backoff;
         fail(error);
       }
     } finally {
@@ -41,7 +52,10 @@ export function pollMarket<T>(
       if (!controller.signal.aborted && !visibility.hidden) {
         const delay =
           typeof interval === 'function' ? interval(data) : interval;
-        timer = setTimeout(run, Math.max(delay, blockedUntil - Date.now()));
+        timer = setTimeout(
+          run,
+          failed ? Math.max(0, blockedUntil - Date.now()) : delay,
+        );
       }
     }
   }

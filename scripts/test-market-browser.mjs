@@ -31,10 +31,28 @@ const cryptoAsset = {
   isDemoOnly: false,
 };
 const requests = [];
+let catalogScenario = 'normal';
+let scenarioRequests = 0;
 const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/api/')) {
     requests.push(path);
+    if (path === '/api/v1/assets') {
+      scenarioRequests++;
+      if (catalogScenario === 'slow')
+        await new Promise((resolve) => setTimeout(resolve, 12_000));
+      if (
+        (catalogScenario === 'transient' || catalogScenario === 'quota') &&
+        scenarioRequests === 1
+      ) {
+        res.writeHead(catalogScenario === 'quota' ? 429 : 503, {
+          'Content-Type': 'application/json',
+          ...(catalogScenario === 'quota' ? { 'Retry-After': '120' } : {}),
+        });
+        res.end(JSON.stringify({ error: 'Isolated unavailable-service test' }));
+        return;
+      }
+    }
     const body =
       path === '/api/v1/assets'
         ? { assets: [asset, cryptoAsset], total: 2 }
@@ -130,7 +148,7 @@ chrome.stdio[4].on('data', (chunk) => {
     if (message.method === 'Fetch.requestPaused') {
       // Fake only the embedding shell, never market prices. Provider contents stay opaque.
       const fixture =
-        "(()=>{const f=document.createElement('iframe');f.srcdoc='<p>Isolated display fixture; no market prices</p>';document.currentScript.parentElement.querySelector('.tradingview-widget-container__widget').appendChild(f);})();";
+        "(()=>{const host=document.currentScript.parentElement;host.style.width='100%';host.style.height='100%';const style=document.createElement('style');style.textContent='.tradingview-widget-copyright .blue-text{color:#2962ff!important}.tradingview-widget-copyright .trademark{color:#b2b5be!important}';document.head.appendChild(style);const f=document.createElement('iframe');f.style.cssText='display:block;border:0;width:100%;height:100%';f.srcdoc='<p>Isolated display fixture; no market prices</p>';document.currentScript.parentElement.querySelector('.tradingview-widget-container__widget').appendChild(f);})();";
       const action = blocked
         ? send(
             'Fetch.failRequest',
@@ -164,7 +182,7 @@ const deadline = setTimeout(() => {
   chrome.kill('SIGKILL');
   server.close();
   process.exitCode = 1;
-}, 85000);
+}, 240000);
 try {
   const target = await send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await send('Target.attachToTarget', {
@@ -172,6 +190,8 @@ try {
     flatten: true,
   });
   await send('Page.enable', {}, sessionId);
+  await send('Network.enable', {}, sessionId);
+  await send('Network.setCacheDisabled', { cacheDisabled: true }, sessionId);
   await send('Runtime.enable', {}, sessionId);
   await send(
     'Fetch.enable',
@@ -186,7 +206,7 @@ try {
     (
       await send(
         'Runtime.evaluate',
-        { expression, returnByValue: true },
+        { expression, returnByValue: true, awaitPromise: true },
         sessionId,
       )
     ).result.value;
@@ -199,12 +219,97 @@ try {
       `Expected browser state: ${expression}; diagnostics=${await evaluate('JSON.stringify({theme:document.documentElement.dataset.theme,button:document.querySelector(".theme-toggle")?.textContent,frames:document.querySelectorAll("iframe").length,text:document.body.innerText.slice(-1200)})')}; exceptions=${JSON.stringify(exceptions)}`,
     );
   }
-  for (const mobile of [false, true]) {
+  async function assertVisible(selector) {
+    const measurement = JSON.parse(
+      await evaluate(`(async () => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return JSON.stringify({ ok: false, reason: 'missing element' });
+      // Scroll the page only: scrollIntoView can secretly scroll overflow:hidden ancestors.
+      const initial = el.getBoundingClientRect();
+      window.scrollTo({ top: Math.max(0, scrollY + initial.top - (innerHeight - initial.height) / 2), left: 0 });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const reasons = [];
+      if (!el.getClientRects().length) reasons.push('no rendered boxes');
+      for (const box of el.getClientRects()) {
+        if (box.width < 1 || box.height < 1) reasons.push('zero size');
+        if (box.left < -1 || box.right > innerWidth + 1 || box.top < -1 || box.bottom > innerHeight + 1) reasons.push('outside viewport');
+        for (let node = el; node; node = node.parentElement) {
+          const style = getComputedStyle(node), clip = node.getBoundingClientRect();
+          if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) reasons.push('hidden style');
+          if (node !== el) {
+            if (['hidden','clip','auto','scroll'].includes(style.overflowX) && (box.left < clip.left - 1 || box.right > clip.right + 1)) reasons.push('horizontal clipping');
+            if (['hidden','clip','auto','scroll'].includes(style.overflowY) && (box.top < clip.top - 1 || box.bottom > clip.bottom + 1)) reasons.push('vertical clipping');
+          }
+        }
+        for (const [x,y] of [[box.left+2,box.top+2],[box.right-2,box.bottom-2],[(box.left+box.right)/2,(box.top+box.bottom)/2]]) {
+          const hit = document.elementFromPoint(x,y);
+          if (hit !== el && !el.contains(hit)) reasons.push('covered or clipped');
+        }
+      }
+      const box = el.getBoundingClientRect(), panel = el.closest('.widget-panel')?.getBoundingClientRect();
+      if (panel && (box.top < panel.top - 1 || box.bottom > panel.bottom + 1)) reasons.push('outside panel bounds');
+      return JSON.stringify({ ok: reasons.length === 0, reasons, height: box.height });
+    })()`),
+    );
+    assert.equal(
+      measurement.ok,
+      true,
+      `${selector}: ${JSON.stringify(measurement)}`,
+    );
+  }
+  async function assertWidgetVisible() {
+    for (const selector of [
+      '.widget-panel h2',
+      '.market-widget-viewport',
+      '.tradingview-widget-container iframe',
+      '.tradingview-widget-copyright',
+      '.tradingview-widget-copyright a',
+      '.widget-panel .price-meta:first-of-type',
+      '.widget-panel .price-meta:last-of-type',
+    ])
+      await assertVisible(selector);
+    const geometry = JSON.parse(
+      await evaluate(`JSON.stringify((() => {
+      const wrapper = document.querySelector('.market-widget-viewport').getBoundingClientRect();
+      const frame = document.querySelector('.tradingview-widget-container iframe').getBoundingClientRect();
+      return { wrapper: wrapper.height, frame: frame.height, expected: innerWidth <= 640 ? 500 : 560 };
+    })())`),
+    );
+    const contrast = JSON.parse(
+      await evaluate(`JSON.stringify([...document.querySelectorAll('.tradingview-widget-copyright .blue-text, .tradingview-widget-copyright .trademark')].map(el => {
+      function rgb(color) { return color.slice(color.indexOf('(')+1,-1).split(',').slice(0,3).map(Number); }
+      function luminance(color) { const c = rgb(color).map(x => { x /= 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return c[0]*0.2126+c[1]*0.7152+c[2]*0.0722; }
+      let parent = el;
+      while (parent && ['transparent','rgba(0, 0, 0, 0)'].includes(getComputedStyle(parent).backgroundColor)) parent = parent.parentElement;
+      const foreground = luminance(getComputedStyle(el).color), background = luminance(getComputedStyle(parent).backgroundColor);
+      return { text: el.textContent, ratio: (Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05) };
+    }))`),
+    );
+    assert.equal(contrast.length, 2);
+    for (const value of contrast)
+      assert.ok(
+        value.ratio >= 4.5,
+        `Attribution contrast: ${JSON.stringify(value)}`,
+      );
+    assert.equal(geometry.wrapper, geometry.expected);
+    assert.ok(
+      geometry.frame >= geometry.wrapper - 2 &&
+        geometry.frame <= geometry.wrapper + 2,
+      JSON.stringify(geometry),
+    );
+  }
+  for (const [width, height] of [
+    [1280, 900],
+    [768, 1024],
+    [390, 844],
+  ]) {
+    const mobile = width < 640;
+
     await send(
       'Emulation.setDeviceMetricsOverride',
       {
-        width: mobile ? 390 : 1280,
-        height: mobile ? 844 : 900,
+        width,
+        height,
         deviceScaleFactor: 1,
         mobile,
       },
@@ -238,6 +343,7 @@ try {
         JSON.stringify('TradingView') +
         "]') && !document.querySelector('.tradingview-widget-container').getAttribute('aria-busy').includes('true')",
     );
+    await assertWidgetVisible();
     const before = await evaluate('document.documentElement.dataset.theme');
     await evaluate("document.querySelector('.theme-toggle').click()");
     await until(
@@ -253,23 +359,143 @@ try {
       await evaluate('document.documentElement.scrollWidth > innerWidth'),
       false,
     );
+    await assertWidgetVisible();
+    for (const theme of ['dark', 'light']) {
+      await evaluate(
+        `localStorage.setItem('marketpulse-theme', ${JSON.stringify(theme)}); window.dispatchEvent(new Event('marketpulse-theme'));`,
+      );
+      await until(
+        `document.documentElement.dataset.theme === ${JSON.stringify(theme)}`,
+      );
+      for (const path of ['/markets', `/assets/${id}`, `/assets/${cryptoId}`]) {
+        await send(
+          'Page.navigate',
+          { url: `http://127.0.0.1:${port}${path}` },
+          sessionId,
+        );
+        await until(
+          "!!document.querySelector('iframe') && document.querySelector('.tradingview-widget-container').getAttribute('aria-busy') === 'false'",
+        );
+        await assertWidgetVisible();
+      }
+    }
+    // Negative control: DOM presence must not pass when a parent clips the footer.
+    await evaluate(
+      "document.querySelector('.widget-panel').style.cssText='height:80px;overflow:hidden'",
+    );
+    await assert.rejects(assertVisible('.tradingview-widget-copyright'));
+    await evaluate(
+      "document.querySelector('.widget-panel').removeAttribute('style')",
+    );
+    await assertWidgetVisible();
+    await evaluate(
+      "(()=>{const overlay=document.createElement('div');overlay.id='visibility-negative-control';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:white';document.body.appendChild(overlay)})()",
+    );
+    await assert.rejects(assertVisible('.tradingview-widget-copyright'));
+    await evaluate(
+      "document.getElementById('visibility-negative-control').remove()",
+    );
+    await assertWidgetVisible();
     const screenshot = await send(
       'Page.captureScreenshot',
       { format: 'png' },
       sessionId,
     );
     await writeFile(
-      join(artifacts, `${mobile ? 'mobile' : 'desktop'}.png`),
+      join(artifacts, `viewport-${width}.png`),
       Buffer.from(screenshot.data, 'base64'),
     );
     results.push({
-      viewport: mobile ? '390x844' : '1280x900',
+      viewport: `${width}x${height}`,
+      visualVisibility:
+        'overview/stock/crypto, dark/light, clipping negative control passed',
       failureRetry: 'pass',
       chartNavigation: 'pass',
       themeSwitch: 'pass',
       horizontalOverflow: false,
     });
   }
+  catalogScenario = 'slow';
+  scenarioRequests = 0;
+  await send(
+    'Page.navigate',
+    { url: `http://127.0.0.1:${port}/markets` },
+    sessionId,
+  );
+  await until(
+    "document.body.innerText.includes('Loading market information') && !!document.querySelector('iframe')",
+  );
+  await until(
+    "document.querySelectorAll('.market-table tbody tr').length === 2",
+  );
+  assert.equal(
+    scenarioRequests,
+    1,
+    'A slow successful catalog must not be duplicated',
+  );
+  assert.equal(
+    await evaluate("!!document.querySelector('[role=alert]')"),
+    false,
+  );
+  results.push({
+    catalogDelay12Seconds:
+      'single request recovered beyond previous 10-second timeout',
+  });
+  catalogScenario = 'transient';
+  scenarioRequests = 0;
+  await send(
+    'Page.navigate',
+    { url: `http://127.0.0.1:${port}/markets` },
+    sessionId,
+  );
+  await until("document.body.innerText.includes('Retrying automatically')");
+  await until(
+    "document.querySelectorAll('.market-table tbody tr').length === 2",
+  );
+  assert.equal(
+    scenarioRequests,
+    2,
+    'One automatic retry should recover the catalog',
+  );
+  catalogScenario = 'transient';
+  scenarioRequests = 0;
+  await send(
+    'Page.navigate',
+    { url: `http://127.0.0.1:${port}/markets` },
+    sessionId,
+  );
+  await until("document.body.innerText.includes('Retrying automatically')");
+  await evaluate(
+    "[...document.querySelectorAll('button')].find(e=>e.textContent === 'Try again').click()",
+  );
+  await until(
+    "document.querySelectorAll('.market-table tbody tr').length === 2",
+  );
+  assert.equal(scenarioRequests, 2);
+  results.push({
+    transientCatalogFailure:
+      'automatic and manual retry recover without native data',
+  });
+  catalogScenario = 'quota';
+  scenarioRequests = 0;
+  await send(
+    'Page.navigate',
+    { url: `http://127.0.0.1:${port}/markets` },
+    sessionId,
+  );
+  await until("document.body.innerText.includes('Request limit reached')");
+  await evaluate(
+    "[...document.querySelectorAll('button')].find(e=>e.textContent === 'Try again').click()",
+  );
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  assert.equal(
+    scenarioRequests,
+    1,
+    'Manual retry must honor the rate-limit cooldown',
+  );
+  results.push({ rateLimit: 'manual retry does not bypass Retry-After' });
+  catalogScenario = 'normal';
+  scenarioRequests = 0;
   silent = true;
   await send(
     'Page.navigate',
@@ -280,37 +506,53 @@ try {
   results.push({ loadedScriptWithoutFrame: 'timeout fallback passed' });
   if (process.env.MARKET_BROWSER_LIVE_WIDGETS === '1') {
     await send('Fetch.disable', {}, sessionId);
-    for (const [label, path] of [
-      ['overview', '/markets'],
-      ['stock', `/assets/${id}`],
-      ['crypto', `/assets/${cryptoId}`],
+    for (const [width, height] of [
+      [1280, 900],
+      [768, 1024],
+      [390, 844],
     ]) {
       await send(
-        'Page.navigate',
-        { url: `http://127.0.0.1:${port}${path}` },
+        'Emulation.setDeviceMetricsOverride',
+        { width, height, deviceScaleFactor: 1, mobile: width < 640 },
         sessionId,
       );
-      await until(
-        "!!document.querySelector('iframe') || document.body.innerText.includes('could not be loaded')",
-      );
-      await new Promise((done) => setTimeout(done, 4000));
-      const live = await evaluate(
-        "JSON.stringify({framePresent:!!document.querySelector('iframe'),busy:document.querySelector('.tradingview-widget-container')?.getAttribute('aria-busy'),fallback:document.body.innerText.includes('could not be loaded')})",
-      );
-      const shot = await send(
-        'Page.captureScreenshot',
-        { format: 'png' },
-        sessionId,
-      );
-      await writeFile(
-        join(artifacts, `live-${label}.png`),
-        Buffer.from(shot.data, 'base64'),
-      );
-      results.push({
-        display: label,
-        actualProviderShell: JSON.parse(live),
-        note: 'No financial data was read from the frame. Inspect screenshot; symbol/feed delivery is not inferred from iframe presence.',
-      });
+      for (const theme of ['dark', 'light']) {
+        await evaluate(
+          `localStorage.setItem('marketpulse-theme', ${JSON.stringify(theme)}); window.dispatchEvent(new Event('marketpulse-theme'));`,
+        );
+        for (const [label, path] of [
+          ['overview', '/markets'],
+          ['stock', `/assets/${id}`],
+          ['crypto', `/assets/${cryptoId}`],
+        ]) {
+          await send(
+            'Page.navigate',
+            { url: `http://127.0.0.1:${port}${path}` },
+            sessionId,
+          );
+          await until(
+            "!!document.querySelector('iframe') && document.querySelector('.tradingview-widget-container').getAttribute('aria-busy') === 'false'",
+          );
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          await assertWidgetVisible();
+          const shot = await send(
+            'Page.captureScreenshot',
+            { format: 'png' },
+            sessionId,
+          );
+          await writeFile(
+            join(artifacts, `live-${width}-${theme}-${label}.png`),
+            Buffer.from(shot.data, 'base64'),
+          );
+          results.push({
+            actualProvider: label,
+            viewport: `${width}x${height}`,
+            theme,
+            geometryAndAttributionVisible: true,
+            note: 'Official frame, full container bounds and hit-tested disclosures verified. No financial values extracted.',
+          });
+        }
+      }
     }
   }
 

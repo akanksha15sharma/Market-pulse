@@ -606,6 +606,67 @@ test('visibility changes never overlap requests and unmount aborts pending respo
   assert.deepEqual(received, []);
 });
 
+test('catalog requests tolerate a slow wake-up and classify transient failures without bypassing cancellation', async (context) => {
+  const original = globalThis.fetch;
+  const budgets: number[] = [];
+  context.mock.method(AbortSignal, 'timeout', (ms: number) => {
+    budgets.push(ms);
+    return new AbortController().signal;
+  });
+  let failure: Error | null = new DOMException('Timed out', 'TimeoutError');
+  let unavailable = false;
+  try {
+    globalThis.fetch = async (input) => {
+      if (String(input).includes(`/assets/${id}`)) {
+        if (failure) throw failure;
+        if (unavailable)
+          return new Response('{}', {
+            status: 503,
+            headers: { 'Retry-After': '120' },
+          });
+        return new Response(JSON.stringify({ asset: stock }));
+      }
+      return new Response(
+        JSON.stringify(
+          String(input).includes('/quotes') ? { quotes: [] } : status,
+        ),
+      );
+    };
+    await assert.rejects(
+      loadAsset(id, new AbortController().signal),
+      (error: unknown) =>
+        error instanceof MarketRequestError &&
+        error.retryMs === 5000 &&
+        /Retrying automatically/.test(error.message),
+    );
+    assert.ok(budgets.includes(45_000));
+    assert.ok(budgets.includes(10_000));
+    failure = new TypeError('Network unavailable');
+    await assert.rejects(
+      loadAsset(id, new AbortController().signal),
+      (error: unknown) =>
+        error instanceof MarketRequestError && error.retryMs === 5000,
+    );
+    failure = null;
+    unavailable = true;
+    await assert.rejects(
+      loadAsset(id, new AbortController().signal),
+      (error: unknown) =>
+        error instanceof MarketRequestError && error.retryMs === 120_000,
+    );
+    const controller = new AbortController();
+    controller.abort();
+    failure = new DOMException('Cancelled', 'AbortError');
+    await assert.rejects(
+      loadAsset(id, controller.signal),
+      (error: unknown) => error instanceof Error && error.name === 'AbortError',
+    );
+  } finally {
+    globalThis.fetch = original;
+    context.mock.restoreAll();
+  }
+});
+
 test('429 honors numeric/date Retry-After and blocks manual retries during cooldown', async () => {
   assert.equal(retryDelay('120'), 120_000);
   assert.equal(retryDelay('invalid'), 60_000);
@@ -626,7 +687,7 @@ test('429 honors numeric/date Retry-After and blocks manual retries during coold
       (error: unknown) =>
         error instanceof MarketRequestError && error.retryMs >= 119_000,
     );
-    const before = calls;
+    const before: number = calls;
     await assert.rejects(
       () => loadOverview(new AbortController().signal),
       MarketRequestError,
@@ -929,11 +990,11 @@ test('polling reports progress only for real requests, respects hidden tabs and 
 test('loading status distinguishes first load from a refresh with cached observations', () => {
   const initial = renderToStaticMarkup(<MarketLoading />);
   assert.match(initial, /role="status"/);
-  assert.match(initial, /Loading the latest cached observations/);
+  assert.match(initial, /Loading market information/);
   const refreshing = renderToStaticMarkup(<MarketLoading refreshing />);
   assert.match(refreshing, /role="status"/);
   assert.match(refreshing, /is-refreshing/);
-  assert.match(refreshing, /Refreshing cached observations/);
+  assert.match(refreshing, /Refreshing market information/);
   assert.match(refreshing, /aria-hidden="true"/);
 });
 
@@ -951,4 +1012,63 @@ test('chart selection stays bounded for large histories and preserves earliest t
   assert.equal(nearestObservation(duplicates, 10), 1);
   assert.equal(nearestObservation(duplicates, 15), 1);
   assert.equal(nearestObservation(duplicates, 100), 3);
+});
+
+test('transient retries back off independently of regular refresh and reset after recovery', async (context) => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
+  const visibility = new Visibility();
+  let calls = 0;
+  const received: number[] = [];
+  const stop = pollMarket(
+    async () => {
+      calls++;
+      if (calls !== 4)
+        throw new MarketRequestError('Transient catalog failure', 5000);
+      return calls;
+    },
+    60_000,
+    (value) => received.push(value),
+    () => {},
+    visibility,
+  );
+  try {
+    await nextTurn();
+    for (const [delay, expected] of [
+      [5000, 2],
+      [10_000, 3],
+      [20_000, 4],
+    ] as const) {
+      context.mock.timers.tick(delay - 1);
+      await nextTurn();
+      assert.equal(calls, expected - 1);
+      context.mock.timers.tick(1);
+      await nextTurn();
+      assert.equal(calls, expected);
+    }
+    assert.deepEqual(received, [4]);
+    context.mock.timers.tick(60_000);
+    await nextTurn();
+    assert.equal(calls, 5);
+    visibility.change(true);
+    visibility.change(false);
+    context.mock.timers.tick(4999);
+    await nextTurn();
+    assert.equal(calls, 5);
+    context.mock.timers.tick(1);
+    await nextTurn();
+    assert.equal(calls, 6);
+    for (const delay of [10_000, 20_000, 40_000, 60_000, 60_000]) {
+      const before: number = calls;
+      context.mock.timers.tick(delay);
+      await nextTurn();
+      assert.equal(calls, before + 1);
+    }
+    stop();
+    context.mock.timers.tick(120_000);
+    await nextTurn();
+    assert.equal(calls, 11);
+  } finally {
+    stop();
+    context.mock.timers.reset();
+  }
 });

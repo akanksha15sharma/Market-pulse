@@ -100,11 +100,13 @@ function WidgetFrame({
           </button>
         </div>
       )}
-      <div
-        className="tradingview-widget-container"
-        ref={host}
-        aria-busy={state === 'loading'}
-      ></div>
+      <div className="market-widget-viewport">
+        <div
+          className="tradingview-widget-container"
+          ref={host}
+          aria-busy={state === 'loading'}
+        />
+      </div>
       <div className="tradingview-widget-copyright">
         <a href={href} target="_blank" rel="noopener nofollow noreferrer">
           <span className="blue-text">
