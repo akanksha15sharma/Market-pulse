@@ -55,3 +55,5 @@ current A1 direction. Earlier records may describe superseded settings; current 
 `.env.example` files, and the deployment runbook define the implemented contract.
 Phase verification files in the project root record checks at that stage rather
 than proving a production deployment.
+
+- [Phase E2 private notification APIs](notifications-e2.md) — security, pagination, transactions, examples, verification and rollback.

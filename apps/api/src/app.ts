@@ -1,3 +1,8 @@
+import { notificationRoutes } from './modules/notifications/routes.js';
+import {
+  createNotificationService,
+  type NotificationService,
+} from './modules/notifications/service.js';
 import express from 'express';
 import { alertRoutes } from './modules/alerts/routes.js';
 import {
@@ -30,7 +35,11 @@ export function createApp(
   market?: MarketService,
   watchlists?: WatchlistService,
   alerts?: AlertService,
-  options: { trustedProxies?: string[]; readiness?: () => Promise<void> } = {},
+  options: {
+    trustedProxies?: string[];
+    readiness?: () => Promise<void>;
+    notifications?: NotificationService;
+  } = {},
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -92,6 +101,11 @@ export function createApp(
   if (watchlists)
     app.use('/api/v1/watchlists', watchlistRoutes(watchlists, auth, config));
   if (alerts) app.use('/api/v1/alerts', alertRoutes(alerts, auth, config));
+  if (options.notifications)
+    app.use(
+      '/api/v1/notifications',
+      notificationRoutes(options.notifications, auth, config),
+    );
   if (market) app.use('/api/v1', marketRoutes(market, auth, config));
   app.get('/api/v1/private/profile', async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -168,6 +182,16 @@ const lazyAlerts = new Proxy({} as AlertService, {
     return alertService[key];
   },
 });
+let notificationService: NotificationService | undefined;
+const lazyNotifications = new Proxy({} as NotificationService, {
+  get(_target, key: keyof NotificationService) {
+    notificationService ??= createNotificationService(
+      getDatabaseClient(),
+      authConfig.secret,
+    );
+    return notificationService[key];
+  },
+});
 export const app = createApp(
   lazyAuth,
   authConfig,
@@ -175,6 +199,7 @@ export const app = createApp(
   lazyWatchlists,
   lazyAlerts,
   {
+    notifications: lazyNotifications,
     trustedProxies: env.TRUSTED_PROXIES,
     readiness: async () => {
       await getDatabaseClient().$queryRaw`SELECT 1`;

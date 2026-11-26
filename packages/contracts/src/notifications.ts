@@ -210,3 +210,16 @@ export type NotificationReadInput = z.infer<typeof notificationReadSchema>;
 export type NotificationQuery = z.infer<typeof notificationQuerySchema>;
 export type NotificationHistory = z.infer<typeof notificationHistorySchema>;
 export type NotificationSummary = z.infer<typeof notificationSummarySchema>;
+
+export const notificationReadResponseSchema = z
+  .object({ notification: notificationHistoryItemSchema })
+  .strict();
+export const notificationReadAllResponseSchema = z
+  .object({ updatedCount: z.number().int().nonnegative() })
+  .strict();
+export type NotificationReadResponse = z.infer<
+  typeof notificationReadResponseSchema
+>;
+export type NotificationReadAllResponse = z.infer<
+  typeof notificationReadAllResponseSchema
+>;
