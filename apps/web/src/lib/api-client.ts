@@ -1,3 +1,4 @@
+import { announceApiWrite } from './api-events';
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -8,7 +9,7 @@ export class ApiError extends Error {
 }
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
@@ -47,7 +48,9 @@ export async function api<T>(
       headers,
       credentials: 'same-origin',
       cache: 'no-store',
-      signal: AbortSignal.timeout(10_000),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(10_000)])
+        : AbortSignal.timeout(10_000),
       ...(options.body !== undefined
         ? { body: JSON.stringify(options.body) }
         : {}),
@@ -58,7 +61,10 @@ export async function api<T>(
       'Cannot reach MarketPulse. Check your connection and try again.',
     );
   }
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) {
+    if (method !== 'GET') announceApiWrite(path);
+    return undefined as T;
+  }
   let body: unknown;
   try {
     body = await response.json();
@@ -79,5 +85,6 @@ export async function api<T>(
         : 'Request failed. Try again.';
     throw new ApiError(response.status, message);
   }
+  if (method !== 'GET') announceApiWrite(path);
   return body as T;
 }

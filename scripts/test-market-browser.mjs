@@ -37,6 +37,11 @@ const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/api/')) {
     requests.push(path);
+    if (path === '/api/v1/notifications/summary') {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Sign in to continue' }));
+      return;
+    }
     if (path === '/api/v1/assets') {
       scenarioRequests++;
       if (catalogScenario === 'slow')
@@ -560,6 +565,7 @@ try {
   assert.ok(
     requests.every(
       (path) =>
+        path === '/api/v1/notifications/summary' ||
         path === '/api/v1/assets' ||
         path === `/api/v1/assets/${id}` ||
         path === `/api/v1/assets/${cryptoId}`,

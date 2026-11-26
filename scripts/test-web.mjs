@@ -8,6 +8,7 @@ const child = spawn(
     'tsx',
     '--test',
     'tests/tradingview.test.tsx',
+    'tests/notifications.test.tsx',
     'tests/auth.test.tsx',
     'tests/markets.test.tsx',
     'tests/watchlists.test.tsx',

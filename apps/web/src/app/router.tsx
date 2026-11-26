@@ -1,3 +1,4 @@
+import { NotificationsPage } from '../pages/NotificationsPage';
 import { AlertsPage } from '../pages/AlertsPage';
 import { alertsLoader, alertsAction } from '../features/alerts/actions';
 import { createBrowserRouter } from 'react-router';
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
         action: alertsAction,
         element: <AlertsPage />,
       },
+      { path: '/notifications', element: <NotificationsPage /> },
       { path: '/account', loader: accountLoader, element: <AccountPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

@@ -1,7 +1,16 @@
+import { NotificationProvider } from '../features/notifications/NotificationProvider';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { useMarketTheme } from '../features/markets/theme';
 import { Link, NavLink, Outlet } from 'react-router';
 
 export function AppLayout() {
+  return (
+    <NotificationProvider>
+      <AppShell />
+    </NotificationProvider>
+  );
+}
+function AppShell() {
   const { theme, toggle } = useMarketTheme();
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -52,6 +61,7 @@ export function AppLayout() {
             >
               Alerts
             </NavLink>
+            <NotificationBell />
             <Link to="/account" className="text-slate-300 hover:text-teal-300">
               Account
             </Link>

@@ -59,3 +59,5 @@ than proving a production deployment.
 - [Phase E2 private notification APIs](notifications-e2.md) — security, pagination, transactions, examples, verification and rollback.
 
 - [Phase E3 genuine notification producers](notifications-e3.md) — atomic account/watchlist events, preferences, deduplication, concurrency and rollback.
+
+- [Phase E4 notification frontend](notifications-e4.md) — bell, inbox, preferences, private refresh rules, browser verification and rollback.

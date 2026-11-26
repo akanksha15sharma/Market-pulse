@@ -144,6 +144,12 @@ try {
   ])
     await run('npm', ['run', name]);
   console.log('All isolated database migration and integration suites passed.');
+  if (process.argv.includes('--notification-browser'))
+    await run(process.execPath, [
+      '--import',
+      'tsx',
+      'scripts/test-notification-browser.mjs',
+    ]);
 } catch (error) {
   console.error(error.message);
   process.exitCode = interrupted ? 130 : 1;
