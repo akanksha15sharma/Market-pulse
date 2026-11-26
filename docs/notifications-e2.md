@@ -1,5 +1,9 @@
 # Phase E2 — private notification backend APIs
 
+> This is the E2 implementation snapshot. [E3](notifications-e3.md) subsequently
+> connects real account/watchlist producers; after E3, new registrations produce
+> account-created history rather than the empty inbox described in E2-only examples.
+
 E2 makes the E1 inbox records readable and manageable through authenticated APIs.
 It does not create activity notifications, implement an inbox UI, send email, run
 workers, extract TradingView data or enable native price alerts. Event producers

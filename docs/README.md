@@ -57,3 +57,5 @@ Phase verification files in the project root record checks at that stage rather
 than proving a production deployment.
 
 - [Phase E2 private notification APIs](notifications-e2.md) — security, pagination, transactions, examples, verification and rollback.
+
+- [Phase E3 genuine notification producers](notifications-e3.md) — atomic account/watchlist events, preferences, deduplication, concurrency and rollback.
