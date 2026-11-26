@@ -13,3 +13,5 @@ export * from './watchlists.js';
 export * from './alerts.js';
 
 export * from './market-capabilities.js';
+
+export * from './notifications.js';

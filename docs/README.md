@@ -5,6 +5,8 @@
 For current setup, supported features, screenshots guidance, and checks, start
 with the [project README](../README.md). See the [widget layout and catalog-loading correction](widget-layout-fix.md) for the visibility regression checks and retry behavior.
 
+See the [E1 notification foundation](notifications-e1.md) for the additive schema, contracts, ER diagram and isolated PostgreSQL test runner. Notification delivery is not implemented yet.
+
 ## Approved public-product direction — documentation steps A1 and A2
 
 These documents distinguish implemented behavior from the intended public release:

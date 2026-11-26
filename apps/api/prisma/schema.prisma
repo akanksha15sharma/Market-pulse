@@ -48,6 +48,26 @@ enum DeliveryStatus {
   EXPIRED
 }
 
+// Only real account/watchlist activity is planned; no price-alert notification kind.
+enum NotificationKind {
+  LEGACY
+  ACCOUNT_CREATED
+  SIGNED_IN
+  SESSION_REVOKED
+  PASSWORD_RESET
+  EMAIL_VERIFIED
+  WATCHLIST_CREATED
+  WATCHLIST_RENAMED
+  WATCHLIST_DELETED
+  WATCHLIST_ASSET_ADDED
+  WATCHLIST_ASSET_REMOVED
+}
+
+enum NotificationSubjectType {
+  ACCOUNT
+  WATCHLIST
+}
+
 model User {
   id String @id @default(uuid()) @db.Uuid
   email String @unique @db.VarChar(254)
@@ -63,6 +83,7 @@ model User {
   portfolios Portfolio[]
   alerts PriceAlert[]
   notifications Notification[]
+  notificationPreference NotificationPreference?
   @@map("users")
 }
 
@@ -253,6 +274,12 @@ model AlertEvent {
 }
 
 model Notification {
+  // Existing rows become LEGACY without rewriting their message or identity.
+  kind NotificationKind @default(LEGACY)
+  eventKey String? @db.VarChar(160)
+  subjectType NotificationSubjectType?
+  // A snapshot reference, deliberately not a foreign key to a deletable watchlist.
+  subjectId String? @db.Uuid
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
   alertEventId String? @db.Uuid
@@ -262,8 +289,21 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: Cascade)
   @@unique([userId, alertEventId])
+  @@unique([userId, eventKey])
   @@index([userId, createdAt])
+  @@index([userId, createdAt, id])
+  @@index([userId, readAt, createdAt, id])
   @@map("notifications")
+}
+
+// Absent rows use shared defaults; the migration creates no per-user rows.
+model NotificationPreference {
+  userId String @id @db.Uuid
+  accountActivityEnabled Boolean @default(true)
+  watchlistActivityEnabled Boolean @default(true)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("notification_preferences")
 }
 
 model EmailDelivery {
