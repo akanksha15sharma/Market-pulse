@@ -12,6 +12,7 @@ import {
   loadNotifications,
   loadNotificationPreferences,
   saveNotificationPreferences,
+  changedNotificationPreferences,
   markAllNotificationsRead,
 } from '../features/notifications/api';
 
@@ -194,6 +195,7 @@ function Preferences({ busy, perform }: { busy: boolean; perform: Perform }) {
   const { expire } = useNotifications();
   const [preferences, setPreferences] =
     useState<NotificationPreferences | null>(null);
+  const [saved, setSaved] = useState<NotificationPreferences | null>(null);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -202,7 +204,10 @@ function Preferences({ busy, perform }: { busy: boolean; perform: Perform }) {
       setError('');
       try {
         const value = await loadNotificationPreferences(controller.signal);
-        if (!controller.signal.aborted) setPreferences(value);
+        if (!controller.signal.aborted) {
+          setPreferences(value);
+          setSaved(value);
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof ApiError && error.status === 401) {
@@ -219,6 +224,11 @@ function Preferences({ busy, perform }: { busy: boolean; perform: Perform }) {
     void load();
     return () => controller.abort();
   }, [retry, expire]);
+  const patch =
+    saved && preferences
+      ? changedNotificationPreferences(saved, preferences)
+      : {};
+  const dirty = Object.keys(patch).length > 0;
   return (
     <section
       className="market-panel notification-preferences"
@@ -237,14 +247,11 @@ function Preferences({ busy, perform }: { busy: boolean; perform: Perform }) {
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            if (!dirty) return;
             void perform(async () => {
-              setPreferences(
-                await saveNotificationPreferences({
-                  accountActivityEnabled: preferences.accountActivityEnabled,
-                  watchlistActivityEnabled:
-                    preferences.watchlistActivityEnabled,
-                }),
-              );
+              const updated = await saveNotificationPreferences(patch);
+              setPreferences(updated);
+              setSaved(updated);
             }, 'Notification preferences saved.');
           }}
         >
@@ -291,7 +298,7 @@ function Preferences({ busy, perform }: { busy: boolean; perform: Perform }) {
               email verification, and session revocation. These settings do not
               enable price alerts or email delivery.
             </p>
-            <button type="submit" className="primary-button">
+            <button type="submit" className="primary-button" disabled={!dirty}>
               {busy ? 'Please wait…' : 'Save preferences'}
             </button>
           </fieldset>

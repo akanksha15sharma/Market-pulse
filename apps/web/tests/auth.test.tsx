@@ -156,3 +156,143 @@ test('skip link points to a focusable main landmark', () => {
   assert.match(html, /<main id="main" tabindex="-1"/);
   assert.match(html, /aria-label="Main navigation"/);
 });
+
+test('parallel secured writes keep each CSRF cookie/header pair together', async () => {
+  const original = globalThis.fetch;
+  let cookie = '',
+    nonce = 0,
+    active = 0,
+    maximum = 0;
+  try {
+    globalThis.fetch = async (path, options) => {
+      if (String(path).endsWith('/csrf')) {
+        active++;
+        maximum = Math.max(maximum, active);
+        const token = `token-${++nonce}`;
+        cookie = token;
+        await new Promise((done) => setTimeout(done, 10));
+        return new Response(JSON.stringify({ csrfToken: token }));
+      }
+      const valid =
+        new Headers(options?.headers).get('X-CSRF-Token') === cookie;
+      active--;
+      return new Response(
+        JSON.stringify(valid ? { ok: true } : { error: 'Invalid CSRF token' }),
+        { status: valid ? 200 : 403 },
+      );
+    };
+    const responses = await Promise.all([
+      api('/notifications/read-all', { method: 'POST', body: {} }),
+      api('/notifications/preferences', {
+        method: 'PATCH',
+        body: { accountActivityEnabled: false },
+      }),
+    ]);
+    assert.deepEqual(responses, [{ ok: true }, { ok: true }]);
+    assert.equal(maximum, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('failed writes release the CSRF queue without automatic replay and reads remain independent', async () => {
+  const original = globalThis.fetch;
+  const paths: string[] = [];
+  try {
+    globalThis.fetch = async (path) => {
+      paths.push(String(path));
+      if (String(path).endsWith('/csrf'))
+        return new Response('{"csrfToken":"token"}');
+      if (String(path).endsWith('/failed'))
+        return new Response('{"error":"Denied"}', { status: 403 });
+      return new Response('{"ok":true}');
+    };
+    const writes = await Promise.allSettled([
+      api('/failed', { method: 'POST' }),
+      api('/succeeded', { method: 'POST' }),
+    ]);
+    assert.equal(writes[0]!.status, 'rejected');
+    assert.equal(writes[1]!.status, 'fulfilled');
+    assert.equal(paths.filter((path) => path.endsWith('/failed')).length, 1);
+    assert.equal(paths.filter((path) => path.endsWith('/csrf')).length, 2);
+    assert.deepEqual(await api('/auth/me'), { ok: true });
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('browser origin lock covers the complete CSRF/write pair and session changes cancel queued writes', async () => {
+  const original = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const originalNavigator = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'navigator',
+  );
+  const events = new EventTarget();
+  let release!: () => void, started!: () => void;
+  const acquired = new Promise<void>((done) => {
+    started = done;
+  });
+  const gate = new Promise<void>((done) => {
+    release = done;
+  });
+  const paths: string[] = [];
+  try {
+    Object.defineProperty(globalThis, 'window', {
+      value: events,
+      configurable: true,
+    });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        locks: {
+          async request(name: string, callback: () => Promise<unknown>) {
+            assert.equal(name, 'marketpulse-csrf-write');
+            started();
+            await gate;
+            return callback();
+          },
+        },
+      },
+      configurable: true,
+    });
+    globalThis.fetch = async (path) => {
+      paths.push(String(path));
+      return new Response(
+        String(path).endsWith('/csrf')
+          ? '{"csrfToken":"token"}'
+          : '{"ok":true}',
+      );
+    };
+    const pending = api('/notifications/read-all', {
+      method: 'POST',
+      body: {},
+    });
+    await acquired;
+    assert.deepEqual(paths, []);
+    events.dispatchEvent(new Event('marketpulse-session-changed'));
+    release();
+    await assert.rejects(
+      pending,
+      (error) => error instanceof ApiError && error.status === 409,
+    );
+    assert.deepEqual(paths, []);
+    assert.deepEqual(
+      await api('/notifications/read-all', { method: 'POST', body: {} }),
+      { ok: true },
+    );
+    assert.deepEqual(paths, [
+      '/api/v1/auth/csrf',
+      '/api/v1/notifications/read-all',
+    ]);
+  } finally {
+    release();
+    globalThis.fetch = original;
+    for (const [name, descriptor] of [
+      ['window', originalWindow],
+      ['navigator', originalNavigator],
+    ] as const) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
+});

@@ -3,7 +3,10 @@ import { Link } from 'react-router';
 import { useLinkToken } from '../features/auth/use-link-token';
 import { api } from '../lib/api-client';
 export function VerifyEmailPage() {
-  const token = useLinkToken();
+  const link = useLinkToken();
+  return <VerifyEmailForm key={link.revision} token={link.token} />;
+}
+function VerifyEmailForm({ token }: { token: string }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

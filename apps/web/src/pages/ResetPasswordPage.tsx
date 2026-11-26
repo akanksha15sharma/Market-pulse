@@ -4,7 +4,10 @@ import { resetPasswordSchema } from '@marketpulse/contracts';
 import { useLinkToken } from '../features/auth/use-link-token';
 import { api } from '../lib/api-client';
 export function ResetPasswordPage() {
-  const token = useLinkToken();
+  const link = useLinkToken();
+  return <ResetPasswordForm key={link.revision} token={link.token} />;
+}
+function ResetPasswordForm({ token }: { token: string }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

@@ -90,7 +90,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch {
       // Visibility refresh still invalidates private state if cross-tab messaging is blocked.
     }
-    if (channel) channel.onmessage = reset;
+    if (channel)
+      channel.onmessage = () =>
+        window.dispatchEvent(new Event(sessionChangeEvent));
     window.addEventListener(sessionChangeEvent, reset);
     window.addEventListener(notificationChangeEvent, run);
     document.addEventListener('visibilitychange', visible);

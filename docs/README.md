@@ -61,3 +61,6 @@ than proving a production deployment.
 - [Phase E3 genuine notification producers](notifications-e3.md) — atomic account/watchlist events, preferences, deduplication, concurrency and rollback.
 
 - [Phase E4 notification frontend](notifications-e4.md) — bell, inbox, preferences, private refresh rules, browser verification and rollback.
+
+- [Phase E5 verification and fixes](notifications-e5.md) — full notification workflows and release rehearsal.
+- [Notifications production runbook](releases/notifications-production.md) — approval-gated migration, deployment, verification and rollback.

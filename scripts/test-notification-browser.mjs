@@ -37,7 +37,14 @@ const config = {
   secure: false,
   ttlSeconds: 3600,
 };
-const auth = createAuthService(db, config, { enabled: false, async send() {} });
+const messages = [];
+const fixtureAssets = [];
+const auth = createAuthService(db, config, {
+  enabled: true,
+  async send(message) {
+    messages.push(message);
+  },
+});
 const api = createApp(
   auth,
   config,
@@ -49,7 +56,28 @@ const api = createApp(
 const wrapper = express();
 let fault = null;
 const writes = [];
+let gateCsrf = false;
+let activeCsrf = 0;
+let maximumCsrf = 0;
+let gatedCsrf = 0;
 wrapper.use(async (req, res, next) => {
+  if (gateCsrf && req.path === '/api/v1/auth/csrf') {
+    res.json = (body) => {
+      activeCsrf++;
+      gatedCsrf++;
+      maximumCsrf = Math.max(maximumCsrf, activeCsrf);
+      // Install the real CSRF cookie headers, delay its JSON body. Concurrent
+      // issuances would overwrite the first cookie before its client can write.
+      res.type('json');
+      res.flushHeaders();
+      setTimeout(() => {
+        activeCsrf--;
+        res.end(JSON.stringify(body));
+      }, 100);
+      return res;
+    };
+  }
+
   if (req.path.startsWith('/api/') && !['GET', 'HEAD'].includes(req.method))
     writes.push({ path: req.path, method: req.method });
   if (fault && req.method === fault.method && req.path === fault.path) {
@@ -164,7 +192,7 @@ try {
     );
   async function input(selector, text) {
     await evaluate(
-      `document.querySelector(${JSON.stringify(selector)}).focus()`,
+      `(()=>{const input=document.querySelector(${JSON.stringify(selector)});input.focus();input.select();})()`,
     );
     await send('Input.insertText', { text }, sessionId);
   }
@@ -484,6 +512,44 @@ try {
   results.push(
     'Failed preference writes keep draft values, do not claim success and can be retried',
   );
+  const listForLifecycle = await db.watchlist.findFirstOrThrow({
+    where: { userId: user.id },
+  });
+  const catalogFixture = await db.asset.create({
+    data: {
+      key: `crypto:e5-browser:${randomUUID()}`,
+      symbol: 'BTC',
+      name: 'Bitcoin',
+      type: 'CRYPTO',
+      isDemoOnly: false,
+    },
+  });
+  fixtureAssets.push(catalogFixture.id);
+  await evaluate(
+    `(async()=>{const write=async(path,method,body)=>{const {csrfToken}=await fetch('/api/v1/auth/csrf').then(r=>r.json());const r=await fetch('/api/v1'+path,{method,headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},...(body?{body:JSON.stringify(body)}:{})});if(!r.ok)throw Error('Lifecycle action failed '+r.status);};const list=${JSON.stringify(listForLifecycle.id)},asset=${JSON.stringify(catalogFixture.id)};await write('/watchlists/'+list+'/items','POST',{assetId:asset});await write('/watchlists/'+list+'/items','POST',{assetId:asset});await write('/watchlists/'+list+'/items/'+asset,'DELETE');await write('/watchlists/'+list+'/items/'+asset,'DELETE');await write('/watchlists/'+list,'DELETE');})()`,
+  );
+  for (const kind of [
+    'WATCHLIST_ASSET_ADDED',
+    'WATCHLIST_ASSET_REMOVED',
+    'WATCHLIST_DELETED',
+  ])
+    assert.equal(
+      await db.notification.count({ where: { userId: user.id, kind } }),
+      1,
+    );
+  await navigate('/notifications');
+  await ready();
+  await click('Load more notifications');
+  await until("document.querySelectorAll('.notification-item').length===27");
+  assert.equal(
+    await evaluate(
+      "[...document.querySelectorAll('.notification-action-link')].filter(e=>e.textContent==='View watchlists').every(e=>e.getAttribute('href')==='/watchlists')",
+    ),
+    true,
+  );
+  results.push(
+    'All five genuine watchlist event types reach the inbox; duplicate adds/removes emit nothing and deleted subjects use safe fallback links',
+  );
   const peerTarget = await send('Target.createTarget', {
     url: config.origin + '/notifications',
   });
@@ -546,12 +612,298 @@ try {
   results.push(
     'Cross-tab account replacement discards the old account history and displays only the new inbox',
   );
+  await navigate('/notifications');
+  await ready();
+  await until("!!document.querySelector('.notification-preferences input')");
+  await evaluate(
+    "document.querySelectorAll('.notification-preferences input')[0].click()",
+  );
+  await peerValue(
+    "document.querySelectorAll('.notification-preferences input')[1].click()",
+  );
+  gateCsrf = true;
+  await Promise.all([
+    click('Save preferences'),
+    peerValue(
+      "[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Save preferences').click()",
+    ),
+  ]);
+  await until(
+    "document.querySelector('[role=status]').textContent.includes('preferences saved')",
+  );
+  for (
+    let i = 0;
+    i < 200 &&
+    !(await peerValue(
+      "document.querySelector('[role=status]')?.textContent.includes('preferences saved')",
+    ));
+    i++
+  )
+    await new Promise((done) => setTimeout(done, 50));
+  assert.equal(
+    await peerValue(
+      "document.querySelector('[role=status]').textContent.includes('preferences saved')",
+    ),
+    true,
+  );
+  gateCsrf = false;
+  assert.equal(gatedCsrf, 2);
+  assert.equal(
+    maximumCsrf,
+    1,
+    'CSRF issuance and writes must be serialized across tabs',
+  );
+  const mergedPreferences = await db.notificationPreference.findUniqueOrThrow({
+    where: {
+      userId: (await db.user.findUniqueOrThrow({ where: { email: emails[1] } }))
+        .id,
+    },
+  });
+  assert.equal(mergedPreferences.accountActivityEnabled, false);
+  assert.equal(
+    mergedPreferences.watchlistActivityEnabled,
+    false,
+    'Saving one field must not overwrite another tab’s field',
+  );
+  results.push(
+    'Concurrent cross-tab preference saves preserve both intents and use intact real CSRF cookie/header pairs',
+  );
   await send('Target.closeTarget', { targetId: peerTarget.targetId });
   await navigate('/notifications');
   await ready();
   const currentUser = await db.user.findUniqueOrThrow({
     where: { email: emails[1] },
   });
+  // Re-read both preferences after concurrent edits, restore optional notifications
+  // through the real UI, then cover every account event with a local-only mailer.
+  await until("!!document.querySelector('.notification-preferences input')");
+  await evaluate(
+    "document.querySelectorAll('.notification-preferences input')[0].click();document.querySelectorAll('.notification-preferences input')[1].click()",
+  );
+  await click('Save preferences');
+  await until(
+    "document.querySelector('[role=status]').textContent.includes('preferences saved')",
+  );
+  await navigate('/login');
+  await until("!!document.querySelector('input[name=email]')");
+  await input('input[name=email]', emails[1]);
+  await input('input[name=password]', 'incorrect test password');
+  await click('Sign in');
+  await until(
+    "document.querySelector('[role=alert]')?.textContent.includes('Invalid email or password')",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'SIGNED_IN' },
+    }),
+    0,
+  );
+  await input(
+    'input[name=password]',
+    'another secure local browser passphrase',
+  );
+  await click('Sign in');
+  await until(
+    "location.pathname==='/account'&&document.querySelector('h1')?.textContent==='Your account'",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'SIGNED_IN' },
+    }),
+    1,
+  );
+  await click('Send verification link');
+  await until(
+    "document.querySelector('[role=status]')?.textContent.includes('Verification email requested')",
+  );
+  const verification = messages
+    .filter(
+      (message) =>
+        message.to === emails[1] && message.subject.includes('Verify'),
+    )
+    .at(-1)
+    ?.text.match(/#token=([a-f0-9]{64})/)?.[1];
+  assert.ok(
+    verification,
+    'Local capture received the actual verification link',
+  );
+  await navigate('/verify-email#token=' + verification);
+  await until(
+    "!![...document.querySelectorAll('button')].find(e=>e.textContent==='Verify email'&&!e.disabled)",
+  );
+  assert.equal(await evaluate("location.hash===''"), true);
+  await click('Verify email');
+  await until(
+    "document.querySelector('[role=status]')?.textContent==='Email verified.'",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'EMAIL_VERIFIED' },
+    }),
+    1,
+  );
+  await navigate('/verify-email#token=' + verification);
+  await until(
+    "!![...document.querySelectorAll('button')].find(e=>e.textContent==='Verify email'&&!e.disabled)",
+  );
+  await click('Verify email');
+  await until(
+    "document.querySelector('[role=alert]')?.textContent.includes('Invalid or expired')",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'EMAIL_VERIFIED' },
+    }),
+    1,
+  );
+  await navigate('/account');
+  await until(
+    "!![...document.querySelectorAll('button')].find(e=>e.textContent==='Revoke')",
+  );
+  await click('Revoke');
+  await until("location.pathname==='/login'");
+  assert.equal(
+    await db.session.count({
+      where: {
+        userId: currentUser.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    }),
+    0,
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'SESSION_REVOKED' },
+    }),
+    2,
+  ); // Login rotation, then explicit revocation.
+  await input('input[name=email]', emails[1]);
+  await input(
+    'input[name=password]',
+    'another secure local browser passphrase',
+  );
+  await click('Sign in');
+  await until("location.pathname==='/account'");
+  await navigate('/forgot-password');
+  await until("!!document.querySelector('input[name=email]')");
+  await input('input[name=email]', emails[1]);
+  await click('Request reset link');
+  await until(
+    "document.querySelector('[role=status]')?.textContent.includes('If the account exists')",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'PASSWORD_RESET' },
+    }),
+    0,
+  );
+  const reset = messages
+    .filter(
+      (message) =>
+        message.to === emails[1] && message.subject.includes('Reset'),
+    )
+    .at(-1)
+    ?.text.match(/#token=([a-f0-9]{64})/)?.[1];
+  assert.ok(reset, 'Local capture received the actual password reset link');
+  await navigate('/reset-password#token=' + reset);
+  await until("!!document.querySelector('input[name=password]')");
+  assert.equal(await evaluate("location.hash===''"), true);
+  await input(
+    'input[name=password]',
+    'the replacement local browser passphrase',
+  );
+  await click('Reset password');
+  await until(
+    "document.querySelector('[role=status]')?.textContent.includes('Password reset. Sign in again.')",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'PASSWORD_RESET' },
+    }),
+    1,
+  );
+  assert.equal(
+    await db.session.count({
+      where: { userId: currentUser.id, revokedAt: null },
+    }),
+    0,
+  );
+  await navigate('/reset-password#token=' + reset);
+  await until("!!document.querySelector('input[name=password]')");
+  await input('input[name=password]', 'should never become a password');
+  await click('Reset password');
+  await until(
+    "document.querySelector('[role=alert]')?.textContent.includes('Invalid or expired')",
+  );
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'PASSWORD_RESET' },
+    }),
+    1,
+  );
+  await navigate('/login');
+  await until("!!document.querySelector('input[name=email]')");
+  await input('input[name=email]', emails[1]);
+  await input(
+    'input[name=password]',
+    'another secure local browser passphrase',
+  );
+  await click('Sign in');
+  await until(
+    "document.querySelector('[role=alert]')?.textContent.includes('Invalid email or password')",
+  );
+  await input(
+    'input[name=password]',
+    'the replacement local browser passphrase',
+  );
+  await click('Sign in');
+  await until("location.pathname==='/account'");
+  await navigate('/notifications');
+  await ready();
+  for (const title of [
+    'Account created',
+    'Signed in',
+    'Session security',
+    'Email verified',
+    'Password reset',
+  ])
+    assert.equal(
+      await evaluate(
+        `[...document.querySelectorAll('.notification-meta strong')].some(e=>e.textContent===${JSON.stringify(title)})`,
+      ),
+      true,
+    );
+  results.push(
+    'Real login, verification, session revocation and password-reset UI workflows produce owned account events; failed credentials and replayed tokens produce none',
+  );
+  await navigate('/account');
+  await until(
+    "!![...document.querySelectorAll('button')].find(e=>e.textContent==='Sign out')",
+  );
+  const revocations = await db.notification.count({
+    where: { userId: currentUser.id, kind: 'SESSION_REVOKED' },
+  });
+  await click('Sign out');
+  await until("location.pathname==='/login'");
+  assert.equal(
+    await db.notification.count({
+      where: { userId: currentUser.id, kind: 'SESSION_REVOKED' },
+    }),
+    revocations + 1,
+  );
+  await input('input[name=email]', emails[1]);
+  await input(
+    'input[name=password]',
+    'the replacement local browser passphrase',
+  );
+  await click('Sign in');
+  await until("location.pathname==='/account'");
+  await navigate('/notifications');
+  await ready();
+  results.push(
+    'Signing out creates one genuine revocation event and removes private UI; subsequent login restores only the current inbox',
+  );
   await db.session.updateMany({
     where: { userId: currentUser.id },
     data: { expiresAt: new Date(0) },
@@ -578,7 +930,7 @@ try {
         exceptions,
         artifacts,
         limitation:
-          'Local browser and real isolated API/database only. Controlled HTTP failures are injected locally; no production deployment or provider/SMTP verification.',
+          'Local browser and real isolated API/database only. Controlled HTTP failures are injected locally; no production deployment, provider verification or external SMTP delivery; account links use an in-memory local mail transport.',
       },
       null,
       2,
@@ -593,5 +945,6 @@ try {
     server.close(done);
   });
   await db.user.deleteMany({ where: { email: { in: emails } } });
+  await db.asset.deleteMany({ where: { id: { in: fixtureAssets } } });
   await db.$disconnect();
 }

@@ -31,7 +31,7 @@
     "worker:once": "node dist/tools/run-market-once.js",
     "test:seed": "node --import tsx --test --test-concurrency=1 tests/unit/seed.test.ts",
     "test:notifications": "node --import tsx --test --test-concurrency=1 tests/unit/notifications.test.ts tests/unit/notification-api.test.ts",
-    "test:notifications:db": "node --import tsx --test --test-concurrency=1 tests/integration/notifications.test.ts tests/integration/notification-api.test.ts tests/integration/notification-producers.test.ts"
+    "test:notifications:db": "node --import tsx --test --test-concurrency=1 tests/integration/notifications.test.ts tests/integration/notification-api.test.ts tests/integration/notification-producers.test.ts tests/integration/notification-release.test.ts"
   },
   "dependencies": {
     "@marketpulse/contracts": "*",

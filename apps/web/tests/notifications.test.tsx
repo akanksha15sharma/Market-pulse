@@ -1,3 +1,4 @@
+import { changedNotificationPreferences } from '../src/features/notifications/api';
 import {
   announceApiWrite,
   sessionChangeEvent,
@@ -312,4 +313,35 @@ test('blocked cross-tab messaging cannot turn successful writes into failures; l
       Object.defineProperty(globalThis, 'window', originalWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }
+});
+
+test('preference drafts send only changed fields so concurrent unrelated edits are not overwritten', () => {
+  const initial = {
+    accountActivityEnabled: true,
+    watchlistActivityEnabled: true,
+    securityNotificationsRequired: true as const,
+  };
+  assert.deepEqual(changedNotificationPreferences(initial, initial), {});
+  assert.deepEqual(
+    changedNotificationPreferences(initial, {
+      ...initial,
+      accountActivityEnabled: false,
+    }),
+    { accountActivityEnabled: false },
+  );
+  assert.deepEqual(
+    changedNotificationPreferences(initial, {
+      ...initial,
+      watchlistActivityEnabled: false,
+    }),
+    { watchlistActivityEnabled: false },
+  );
+  assert.deepEqual(
+    changedNotificationPreferences(initial, {
+      ...initial,
+      accountActivityEnabled: false,
+      watchlistActivityEnabled: false,
+    }),
+    { accountActivityEnabled: false, watchlistActivityEnabled: false },
+  );
 });

@@ -8,6 +8,8 @@ import {
   notificationReadSchema,
   notificationReadResponseSchema,
   notificationReadAllResponseSchema,
+  type NotificationPreferences,
+  type NotificationPreferencePatch,
 } from '@marketpulse/contracts';
 import { api, ApiError } from '../../lib/api-client';
 
@@ -63,3 +65,17 @@ export const markAllNotificationsRead = () =>
     notificationReadAllResponseSchema,
     api('/notifications/read-all', { method: 'POST', body: {} }),
   );
+
+export function changedNotificationPreferences(
+  saved: NotificationPreferences,
+  draft: NotificationPreferences,
+): NotificationPreferencePatch {
+  return {
+    ...(saved.accountActivityEnabled !== draft.accountActivityEnabled
+      ? { accountActivityEnabled: draft.accountActivityEnabled }
+      : {}),
+    ...(saved.watchlistActivityEnabled !== draft.watchlistActivityEnabled
+      ? { watchlistActivityEnabled: draft.watchlistActivityEnabled }
+      : {}),
+  };
+}

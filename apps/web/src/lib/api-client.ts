@@ -1,4 +1,4 @@
-import { announceApiWrite } from './api-events';
+import { announceApiWrite, sessionChangeEvent } from './api-events';
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -7,10 +7,48 @@ export class ApiError extends Error {
     super(message);
   }
 }
+type ApiOptions = { method?: string; body?: unknown; signal?: AbortSignal };
+let pendingWrite: Promise<unknown> = Promise.resolve();
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  options: ApiOptions = {},
 ): Promise<T> {
+  if ((options.method ?? 'GET') === 'GET') return request<T>(path, options);
+  let sessionChanged = false;
+  const invalidate = () => {
+    sessionChanged = true;
+  };
+  if (typeof window !== 'undefined')
+    window.addEventListener(sessionChangeEvent, invalidate);
+  const perform = () => {
+    if (sessionChanged)
+      throw new ApiError(
+        409,
+        'Your session changed. Refresh the page before trying again.',
+      );
+    return request<T>(path, options);
+  };
+  const secured = async (): Promise<T> =>
+    typeof window !== 'undefined' &&
+    typeof navigator !== 'undefined' &&
+    navigator.locks
+      ? await navigator.locks.request('marketpulse-csrf-write', perform)
+      : await perform();
+  // Keep token issuance and its write together; reads remain independent. A failed
+  // write releases the queue without replaying that business operation.
+  const result = pendingWrite.then(secured, secured);
+  pendingWrite = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  try {
+    return await result;
+  } finally {
+    if (typeof window !== 'undefined')
+      window.removeEventListener(sessionChangeEvent, invalidate);
+  }
+}
+async function request<T>(path: string, options: ApiOptions): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
   if (method !== 'GET') {

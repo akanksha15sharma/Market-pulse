@@ -1,5 +1,8 @@
 # Phase E4 — private notification bell, inbox and preferences
 
+> E4 snapshot: [E5](notifications-e5.md) adds cross-tab CSRF serialization, partial
+> preference edits, account-link navigation fixes and a production release rehearsal.
+
 E4 adds the frontend for the genuine E3 notifications and private E2 APIs. It does
 not generate events, infer market prices, enable native price alerts, send emails,
 change the database or deploy anything. Notification rows still come only from
