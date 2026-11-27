@@ -6,6 +6,33 @@ No step below was executed against Neon, Render or Vercel during E5. No producti
 credential is stored in this document. Keep the existing free plans, URLs, secrets,
 origin/proxy rules and market-data safeguards. No paid feature is required.
 
+## Disabled-first rollout flag
+
+Use the newer commit containing this flag, not `a3742d6` (which always enabled
+notifications). `NOTIFICATIONS_ENABLED` is server-only and defaults to `false` in
+all environments. Only the exact value `true` enables notification APIs and
+producers; invalid values fail configuration validation. A restart is required.
+
+For initial Render deployment, leave the variable unset or keep it `false`.
+No environment change is needed when it is absent. Keep production changes and
+deployment pending approval. With the flag off:
+
+- Authentication, origin/CSRF checks, rate limits and normal account/watchlist
+  operations remain active.
+- Authenticated `GET /api/v1/notifications/summary` returns HTTP 200 with
+  `{enabled:false, unreadCount:null}`; other notification endpoints return 503.
+  Unauthenticated requests still return 401.
+- All notification producers, including security notices, are paused before
+  accessing notification tables. Existing history and preferences remain intact.
+- Email and native price alerts remain disabled independently of this flag.
+
+Enable later only with approval by setting `NOTIFICATIONS_ENABLED=true` and
+restarting/deploying the approved backend. User preferences still apply once on;
+mandatory security notices cannot be individually opted out of. Events skipped
+while globally disabled are not backfilled. To pause again, set `false` and restart;
+retain E1 and every existing record. Isolated integration tests explicitly opt in
+so their enabled-path coverage remains meaningful.
+
 ## Release identity and order
 
 Use one reviewed, immutable Git commit containing E1–E5 for both applications.

@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { test } from 'node:test';
+import { after, before, test } from 'node:test';
+import { env } from '../../src/config/env.js';
 import { createNotificationCursor } from '../../src/modules/notifications/cursor.js';
 import { createApp } from '../../src/app.js';
 import type { AuthService } from '../../src/modules/auth/service.js';
 import type { NotificationService } from '../../src/modules/notifications/service.js';
 import { HttpError } from '../../src/lib/http-error.js';
 import { cookieJar, request } from '../helpers/http.js';
+
+const previousFlag = env.NOTIFICATIONS_ENABLED;
+before(() => {
+  env.NOTIFICATIONS_ENABLED = true;
+});
+after(() => {
+  env.NOTIFICATIONS_ENABLED = previousFlag;
+});
 
 const config = {
   origin: 'http://localhost:5173',
@@ -224,4 +233,92 @@ test('signed keyset cursors reject tampering, other accounts/filters, invalid pa
       operation,
       (error) => error instanceof HttpError && error.status === 400,
     );
+});
+
+test('disabled notifications retain security, return an honest private summary, and never call inbox services', async () => {
+  env.NOTIFICATIONS_ENABLED = false;
+  try {
+    const { app, calls } = fixture();
+    assert.equal(
+      (await request(app, 'GET', '/api/v1/notifications/summary')).status,
+      401,
+    );
+    const valid = await headers(app);
+    const summary = await request(
+      app,
+      'GET',
+      '/api/v1/notifications/summary',
+      valid,
+    );
+    assert.equal(summary.status, 200);
+    assert.deepEqual(summary.body, { enabled: false, unreadCount: null });
+    assert.equal(summary.headers['cache-control'], 'no-store');
+    for (const path of [
+      '/api/v1/notifications',
+      '/api/v1/notifications/preferences',
+    ]) {
+      assert.equal((await request(app, 'GET', path)).status, 401);
+      const disabled = await request(app, 'GET', path, valid);
+      assert.equal(disabled.status, 503);
+      assert.equal(disabled.headers['retry-after'], '30');
+    }
+    for (const [method, path, body] of [
+      [
+        'PATCH',
+        '/api/v1/notifications/preferences',
+        { accountActivityEnabled: false },
+      ],
+      ['PATCH', `/api/v1/notifications/${randomUUID()}/read`, { read: true }],
+      ['POST', '/api/v1/notifications/read-all', {}],
+    ] as const) {
+      assert.equal(
+        (
+          await request(
+            app,
+            method,
+            path,
+            { cookie: valid.cookie, origin: config.origin },
+            body,
+          )
+        ).status,
+        403,
+      );
+      assert.equal((await request(app, method, path, valid, body)).status, 503);
+    }
+    assert.equal(
+      (
+        await request(
+          app,
+          'GET',
+          '/api/v1/notifications/summary?unknown=1',
+          valid,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(app, 'GET', '/api/v1/notifications/summary', {
+          ...valid,
+          origin: 'https://evil.example',
+        })
+      ).status,
+      403,
+    );
+    const limited = fixture({ limited: true });
+    assert.equal(
+      (
+        await request(
+          limited.app,
+          'GET',
+          '/api/v1/notifications/summary',
+          valid,
+        )
+      ).status,
+      429,
+    );
+    assert.equal(calls.length, 0);
+  } finally {
+    env.NOTIFICATIONS_ENABLED = true;
+  }
 });

@@ -1,3 +1,4 @@
+import { env } from '../../config/env.js';
 import {
   notificationCategories,
   notificationEventKey,
@@ -34,6 +35,7 @@ export async function recordNotification(
     subjectId?: string;
   },
 ) {
+  if (!env.NOTIFICATIONS_ENABLED) return false;
   const event = notificationEventSchema.parse({
     userId: input.userId,
     kind: input.kind,

@@ -1,3 +1,4 @@
+import { env } from '../../src/config/env.js';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -15,6 +16,7 @@ import { createApp } from '../../src/app.js';
 import { HttpError } from '../../src/lib/http-error.js';
 import { cookieJar, request } from '../helpers/http.js';
 
+const previousFlag = env.NOTIFICATIONS_ENABLED;
 const raw = process.env.TEST_DATABASE_URL;
 if (!raw) throw new Error('Explicit local TEST_DATABASE_URL required');
 const target = new URL(raw);
@@ -38,10 +40,12 @@ const keys: string[] = [];
 const status = (expected: number) => (error: unknown) =>
   error instanceof HttpError && error.status === expected;
 before(async () => {
+  env.NOTIFICATIONS_ENABLED = true;
   await db.$connect();
   await otherDb.$connect();
 });
 after(async () => {
+  env.NOTIFICATIONS_ENABLED = previousFlag;
   try {
     await db.user.deleteMany({ where: { id: { in: users } } });
     await db.authRateLimit.deleteMany({ where: { key: { in: keys } } });

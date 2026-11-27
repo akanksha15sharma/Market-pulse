@@ -50,6 +50,10 @@ export function parseRuntimeEnv(input: Record<string, string | undefined>) {
         .max(604800)
         .default(604800),
       CSRF_SECRET: z.string().min(64).optional(),
+      NOTIFICATIONS_ENABLED: z
+        .enum(['true', 'false'])
+        .default('false')
+        .transform((value) => value === 'true'),
       EMAIL_MODE: z.enum(['disabled', 'mailpit']).default('disabled'),
       MAILPIT_URL: z.url().default('http://127.0.0.1:8025'),
     })

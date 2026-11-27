@@ -1,3 +1,4 @@
+import { env } from '../../src/config/env.js';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -13,6 +14,7 @@ import { notificationTransaction } from '../../src/modules/notifications/transac
 import { digest, hashPassword } from '../../src/modules/auth/security.js';
 import { HttpError } from '../../src/lib/http-error.js';
 
+const previousFlag = env.NOTIFICATIONS_ENABLED;
 const raw = process.env.TEST_DATABASE_URL;
 if (!raw) throw new Error('Explicit local TEST_DATABASE_URL required');
 const target = new URL(raw);
@@ -42,11 +44,13 @@ const status = (code: number) => (error: unknown) =>
 const password = 'a long local test passphrase';
 let passwordHash: string;
 before(async () => {
+  env.NOTIFICATIONS_ENABLED = true;
   await db.$connect();
   await secondDb.$connect();
   passwordHash = await hashPassword(password);
 });
 after(async () => {
+  env.NOTIFICATIONS_ENABLED = previousFlag;
   try {
     await db.user.deleteMany({
       where: { OR: [{ id: { in: users } }, { email: { in: emails } }] },
@@ -601,4 +605,87 @@ test('preferences and producers share the same account lock, so a committed opt-
   await Promise.all([update, creation]);
   assert.equal(await count(owner.id), 0);
   assert.equal(await db.watchlist.count({ where: { userId: owner.id } }), 1);
+});
+
+test('disabled producers preserve existing history/preferences and commit real account/watchlist/security operations without notices', async () => {
+  const owner = await user();
+  const original = await lists.create(owner.id, { name: 'Retained history' });
+  await inbox.patchPreferences(owner.id, {
+    accountActivityEnabled: false,
+    watchlistActivityEnabled: false,
+  });
+  const history = await db.notification.findMany({
+    where: { userId: owner.id },
+  });
+  const preferences = await db.notificationPreference.findUniqueOrThrow({
+    where: { userId: owner.id },
+  });
+  env.NOTIFICATIONS_ENABLED = false;
+  try {
+    const account = await repo.register(
+      { email: email(), displayName: 'Disabled rollout', passwordHash },
+      digest(randomUUID()),
+      expiry(),
+    );
+    users.push(account.id);
+    const loginHash = digest(randomUUID());
+    assert.ok(await repo.login(account, loginHash, expiry()));
+    const list = await lists.create(account.id, { name: 'Real list' });
+    await lists.rename(account.id, list.id, { name: 'Updated list' });
+    const item = await asset();
+    await lists.add(account.id, list.id, item.id);
+    assert.equal((await lists.get(account.id, list.id)).items.length, 1);
+    await lists.remove(account.id, list.id, item.id);
+    await lists.delete(account.id, list.id);
+    const active = await session(account.id);
+    assert.equal((await repo.revoke(account.id, active.id)).count, 1);
+    await repo.logout(loginHash);
+    const verify = await token(account.id, 'VERIFY_EMAIL');
+    assert.equal(await repo.verify(verify.tokenHash), true);
+    const reset = await token(account.id, 'RESET_PASSWORD');
+    assert.equal(
+      await repo.reset(account.id, reset.id, 'new disabled-rollout test hash'),
+      true,
+    );
+    assert.equal(await count(account.id), 0);
+    assert.equal(
+      await db.notificationPreference.count({ where: { userId: account.id } }),
+      0,
+    );
+    await lists.rename(owner.id, original.id, {
+      name: 'Changed while disabled',
+    });
+    assert.deepEqual(
+      await db.notification.findMany({ where: { userId: owner.id } }),
+      history,
+    );
+    assert.deepEqual(
+      await db.notificationPreference.findUniqueOrThrow({
+        where: { userId: owner.id },
+      }),
+      preferences,
+    );
+    assert.equal(
+      (await db.user.findUniqueOrThrow({ where: { id: account.id } }))
+        .passwordHash,
+      'new disabled-rollout test hash',
+    );
+    // A disabled producer must not access even its transaction client.
+    assert.equal(
+      await recordNotification({} as Parameters<typeof recordNotification>[0], {
+        userId: account.id,
+        kind: 'PASSWORD_RESET',
+        operationId: randomUUID(),
+      }),
+      false,
+    );
+  } finally {
+    env.NOTIFICATIONS_ENABLED = true;
+  }
+  // Opting back in records only subsequent genuine actions, without backfill.
+  await lists.create(owner.id, { name: 'Still opted out' });
+  assert.deepEqual(
+    await db.notification.findMany({ where: { userId: owner.id } }),
+    history,
+  );
 });

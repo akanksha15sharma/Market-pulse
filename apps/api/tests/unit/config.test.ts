@@ -136,3 +136,23 @@ test('production preflight CLI exits safely for valid and invalid configuration'
     );
   }
 });
+
+test('notifications default off, require explicit true, and reject ambiguous flag values', () => {
+  for (const input of [{}, production]) {
+    assert.equal(parseRuntimeEnv(input).NOTIFICATIONS_ENABLED, false);
+    assert.equal(
+      parseRuntimeEnv({ ...input, NOTIFICATIONS_ENABLED: 'false' })
+        .NOTIFICATIONS_ENABLED,
+      false,
+    );
+    assert.equal(
+      parseRuntimeEnv({ ...input, NOTIFICATIONS_ENABLED: 'true' })
+        .NOTIFICATIONS_ENABLED,
+      true,
+    );
+    for (const value of ['', '0', '1', 'yes', 'TRUE'])
+      assert.throws(() =>
+        parseRuntimeEnv({ ...input, NOTIFICATIONS_ENABLED: value }),
+      );
+  }
+});

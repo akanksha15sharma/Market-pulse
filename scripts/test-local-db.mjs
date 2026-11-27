@@ -51,6 +51,7 @@ const env = {
   APP_ORIGIN: 'http://127.0.0.1:5173',
   CSRF_SECRET: 'a'.repeat(64),
   EMAIL_MODE: 'disabled',
+  NOTIFICATIONS_ENABLED: 'true', // Explicit opt-in for isolated E1–E5 coverage.
   MARKET_WORKER_ENABLED: 'false',
   MARKET_ALWAYS_ON: 'false',
   DOTENV_CONFIG_PATH: join(temporary, 'absent-env'),

@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+  notificationSummarySchema,
   notificationReadSchema,
   notificationReadAllSchema,
   notificationQuerySchema,
   notificationPreferencePatchSchema,
 } from '@marketpulse/contracts';
-import type { AuthConfig } from '../../config/env.js';
+import { env, type AuthConfig } from '../../config/env.js';
+import { HttpError } from '../../lib/http-error.js';
 import type { AuthService } from '../auth/service.js';
 import { digest, requireCsrf, sessionToken } from '../auth/security.js';
 import type { NotificationService } from './service.js';
@@ -32,11 +34,23 @@ export function notificationRoutes(
     else z.object({}).strict().parse(req.query);
     next();
   });
+  // The existing auth, CSRF, rate-limit and query checks run before this gate.
+  router.get('/summary', async (_req, res) => {
+    if (!env.NOTIFICATIONS_ENABLED) {
+      res.json(
+        notificationSummarySchema.parse({ enabled: false, unreadCount: null }),
+      );
+      return;
+    }
+    res.json(await service.summary(res.locals.userId as string));
+  });
+  router.use((_req, _res, next) => {
+    if (!env.NOTIFICATIONS_ENABLED)
+      throw new HttpError(503, 'Notifications are currently unavailable');
+    next();
+  });
   router.get('/', async (req, res) =>
     res.json(await service.history(res.locals.userId as string, req.query)),
-  );
-  router.get('/summary', async (_req, res) =>
-    res.json(await service.summary(res.locals.userId as string)),
   );
   router.get('/preferences', async (_req, res) =>
     res.json(await service.preferences(res.locals.userId as string)),
