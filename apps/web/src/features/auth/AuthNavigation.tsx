@@ -1,3 +1,4 @@
+import { ProfileDropdown } from './ProfileDropdown';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { api, ApiError } from '../../lib/api-client';
@@ -21,37 +22,23 @@ export function SessionLinks({
 }) {
   if (status === 'loading')
     return (
-      <span role="status" className="text-slate-300">
+      <span role="status" className="nav-session-status">
         Checking session…
       </span>
     );
   if (status === 'error')
     return (
-      <button type="button" className="text-teal-300" onClick={retry}>
+      <button type="button" className="nav-auth-button" onClick={retry}>
         Retry account status
       </button>
     );
   if (status === 'guest')
     return (
-      <Link to="/login" className="text-teal-300">
+      <Link to="/login" className="nav-auth-button">
         Sign in
       </Link>
     );
-  return (
-    <>
-      <Link to="/account" className="text-slate-300 hover:text-teal-300">
-        Account
-      </Link>
-      <button
-        type="button"
-        className="text-teal-300"
-        disabled={busy}
-        onClick={signOut}
-      >
-        {busy ? 'Signing out…' : 'Sign out'}
-      </button>
-    </>
-  );
+  return <ProfileDropdown busy={busy} signOut={signOut} />;
 }
 
 export function AuthNavigation() {

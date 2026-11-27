@@ -1,8 +1,6 @@
-import { AuthNavigation } from '../features/auth/AuthNavigation';
 import { NotificationProvider } from '../features/notifications/NotificationProvider';
-import { NotificationBell } from '../features/notifications/NotificationBell';
-import { useMarketTheme } from '../features/markets/theme';
-import { Link, NavLink, Outlet } from 'react-router';
+import { Navbar } from './Navbar';
+import { Outlet } from 'react-router';
 
 export function AppLayout() {
   return (
@@ -12,7 +10,6 @@ export function AppLayout() {
   );
 }
 function AppShell() {
-  const { theme, toggle } = useMarketTheme();
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <a
@@ -21,52 +18,7 @@ function AppShell() {
       >
         Skip to content
       </a>
-      <header className="border-b border-slate-800">
-        <nav
-          aria-label="Main navigation"
-          className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5"
-        >
-          <Link
-            to="/"
-            className="brand text-xl font-semibold tracking-tight text-teal-300"
-          >
-            <span className="brand-symbol" aria-hidden="true">
-              M
-            </span>{' '}
-            MarketPulse
-          </Link>
-          <div className="nav-links flex gap-5 text-sm">
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={toggle}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? 'Light' : 'Dark'} mode
-            </button>
-            <NavLink
-              to="/markets"
-              className="text-slate-300 hover:text-teal-300"
-            >
-              Markets
-            </NavLink>
-            <NavLink
-              to="/watchlists"
-              className="text-slate-300 hover:text-teal-300"
-            >
-              Watchlists
-            </NavLink>
-            <NavLink
-              to="/alerts"
-              className="text-slate-300 hover:text-teal-300"
-            >
-              Alerts
-            </NavLink>
-            <NotificationBell />
-            <AuthNavigation />
-          </div>
-        </nav>
-      </header>
+      <Navbar />
       <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-6 py-10">
         <Outlet />
       </main>

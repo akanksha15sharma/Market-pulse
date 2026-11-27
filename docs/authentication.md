@@ -208,3 +208,22 @@ requests are aborted and cannot restore stale state after logout or expiry.
 Navbar sign-out uses the existing CSRF-protected logout API, displays failures,
 and redirects only after success or confirmed session expiry. Account-page
 sign-out remains supported. Backend authorization remains the security boundary.
+
+The navbar uses theme-aware colors, an icon-only theme button with an accessible
+label, active route indicators, and a native profile disclosure. The profile
+contains account access, a link to notification preferences, and the existing
+secured sign-out action. Escape closes the profile and returns focus to its
+trigger; outside clicks and route changes dismiss it. Below 1024px, a labeled
+mobile navigation button controls the links. Collapsed links cannot receive
+keyboard focus. Escape, outside clicks, and navigation dismiss the mobile panel.
+Theme persistence continues to use the existing theme hook.
+
+After `npm run build -w @marketpulse/web`, run `npm run test:navbar:browser`
+(requires Chrome; optionally set `CHROME_BIN`). This starts a loopback server with
+synthetic sessions and blocked HTTPS requests, not a production database or live
+provider. It checks rendered visibility/hit targets, no horizontal overflow,
+text contrast of at least 4.5:1, theme persistence, profile/mobile keyboard
+controls, and successful/failed CSRF-protected sign-out at desktop, tablet, and
+mobile widths in both themes. Screenshots are saved in the printed temporary
+artifact directory. This test does not establish live backend authentication or
+market-provider correctness.

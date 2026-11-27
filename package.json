@@ -50,6 +50,7 @@
     "test:notifications": "npm run test:notifications -w @marketpulse/api",
     "test:notifications:db": "npm run test:notifications:db -w @marketpulse/api",
     "test:integration:local": "node scripts/test-local-db.mjs",
+    "test:navbar:browser": "node scripts/test-navbar-browser.mjs",
     "test:notifications:browser": "node scripts/test-local-db.mjs --notification-browser"
   },
   "devDependencies": {
