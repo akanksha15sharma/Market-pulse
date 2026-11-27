@@ -45,7 +45,7 @@ export function PasswordField({
           aria-label={`${visible ? 'Hide' : 'Show'} ${confirm ? 'confirmation password' : 'password'}`}
           aria-pressed={visible}
           aria-controls={name}
-          title={`${visible ? 'Hide' : 'Show'} password`}
+          title={`${visible ? 'Hide' : 'Show'} ${confirm ? 'confirmation password' : 'password'}`}
         >
           <svg
             width="20"

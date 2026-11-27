@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
     else if (
       authMode &&
       req.method === 'POST' &&
-      /^\/api\/v1\/auth\/(login|register|forgot-password|reset-password)$/.test(
+      /^\/api\/v1\/auth\/(login|register|forgot-password|reset-password|verify-email)$/.test(
         path,
       )
     ) {
@@ -106,6 +106,8 @@ const server = http.createServer(async (req, res) => {
       } else if (path.endsWith('/reset-password')) {
         signedIn = false;
         body = { message: 'Password reset. Sign in again.' };
+      } else if (path.endsWith('/verify-email')) {
+        body = { message: 'Email verified.' };
       } else
         body = {
           message: 'If the account exists, a reset email will be sent.',
@@ -658,6 +660,7 @@ try {
           '/register',
           '/forgot-password',
           `/reset-password#token=${token}`,
+          `/verify-email#token=${token}`,
         ]) {
           await navigate(path);
           await evaluate(
@@ -669,13 +672,17 @@ try {
           for (const selector of [
             '.auth-page h1',
             '.auth-description',
-            '.auth-field label',
-            '.auth-form input',
+            ...(!path.startsWith('/verify-email')
+              ? ['.auth-field label', '.auth-form input']
+              : ['.auth-hint']),
             '.auth-submit',
             '.auth-footer a',
           ])
             await checkControl(selector);
-          if (path !== '/forgot-password') {
+          if (
+            path !== '/forgot-password' &&
+            !path.startsWith('/verify-email')
+          ) {
             await checkControl('.password-toggle');
             await click('.password-toggle');
             await until(
@@ -725,7 +732,7 @@ try {
           );
         }
         results.push(
-          `${width}px ${theme}: all four auth pages, visible controls, contrast, password toggles and no overflow`,
+          `${width}px ${theme}: all five auth pages, visible controls, contrast, password toggles and no overflow`,
         );
       }
     }
@@ -751,6 +758,17 @@ try {
     await checkControl('.auth-field-error');
     await input('#password', secret);
     await input('#confirmPassword', secret);
+    await input('#password', secret + 'changed');
+    await until(
+      "document.querySelector('#confirmPassword-error')?.textContent.includes('do not match')",
+    );
+    await input('#password', secret);
+    await until("!document.querySelector('#confirmPassword-error')");
+    assert.equal(
+      authRequests.length,
+      before,
+      'Typing and correcting confirmation does not make API requests',
+    );
     holdAuth = true;
     await evaluate(
       "document.querySelector('.auth-form').requestSubmit();document.querySelector('.auth-form').requestSubmit()",
@@ -903,6 +921,49 @@ try {
     assert.equal(
       await evaluate("!!document.querySelector('input[name=password]')"),
       false,
+    );
+    await navigate('/verify-email');
+    await until("!!document.querySelector('.auth-invalid-link')");
+    assert.equal(
+      await evaluate("!!document.querySelector('.auth-form')"),
+      false,
+    );
+    await navigate('/verify-email#token=malformed-private-token');
+    await until(
+      "!!document.querySelector('.auth-invalid-link') && location.hash === ''",
+    );
+    assert.equal(
+      await evaluate("!!document.querySelector('.auth-form')"),
+      false,
+    );
+    await navigate(`/verify-email#token=${token}`);
+    await until(
+      "!!document.querySelector('.auth-submit') && location.hash === ''",
+    );
+    authFault = 400;
+    await submit();
+    await until(
+      "document.querySelector('.auth-error')?.textContent.includes('Invalid or expired verification link')",
+    );
+    authFault = 0;
+    before = authRequests.length;
+    holdAuth = true;
+    await evaluate(
+      "document.querySelector('.auth-form').requestSubmit();document.querySelector('.auth-form').requestSubmit()",
+    );
+    await until(
+      "document.querySelector('.auth-submit').textContent.includes('Verifying') && document.querySelector('.auth-submit').disabled",
+    );
+    await waitForPosts(before + 1);
+    assert.equal(heldAuth.length, 1);
+    holdAuth = false;
+    heldAuth.splice(0).forEach((done) => done());
+    await until(
+      "document.querySelector('.auth-result [role=status]')?.textContent.includes('Email verified')",
+    );
+    assert.deepEqual(authRequests.at(-1).payload, { token });
+    results.push(
+      'Verification: styled layouts, invalid/expired links, URL secrecy, pending controls and duplicate-submit prevention',
     );
     assert.ok(
       requestedUrls.every(

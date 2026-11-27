@@ -2648,7 +2648,7 @@ html[data-theme='light'] .workspace-page {
   display: grid;
   place-items: center;
   width: 44px;
-  height: 40px;
+  height: 44px;
   border-radius: 0.5rem;
   color: var(--dashboard-muted);
   cursor: pointer;

@@ -586,3 +586,18 @@ test('password controls have explicit non-submit buttons, manager support and li
   assert.match(register, /type="submit"/);
   assert.match(register, /noValidate=""/);
 });
+
+test('verification failures explain expired links without exposing server details', async () => {
+  const { authFailureMessage } =
+    await import('../src/features/auth/form-validation');
+  const message = authFailureMessage(
+    new ApiError(400, 'private-verification-token'),
+    'verify',
+  );
+  assert.match(message, /Invalid or expired verification link/);
+  assert.doesNotMatch(message, /private-verification-token/);
+  assert.match(
+    authFailureMessage(new ApiError(429, 'private'), 'verify'),
+    /Too many attempts/,
+  );
+});

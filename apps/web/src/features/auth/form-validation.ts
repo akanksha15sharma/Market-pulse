@@ -62,7 +62,7 @@ export function validateAuthForm(
   };
 }
 
-export function authFailureMessage(error: unknown, mode: AuthMode) {
+export function authFailureMessage(error: unknown, mode: AuthMode | 'verify') {
   if (error instanceof ApiError) {
     if (error.status === 0)
       return 'Cannot reach MarketPulse. Check your connection and try again.';
@@ -72,6 +72,8 @@ export function authFailureMessage(error: unknown, mode: AuthMode) {
       return 'Invalid email or password.';
     if (error.status === 400 && mode === 'reset')
       return 'Invalid or expired reset link. Request a new link and try again.';
+    if (error.status === 400 && mode === 'verify')
+      return 'Invalid or expired verification link. Request a new link from your account.';
     if (error.status === 400) return 'Please check your details and try again.';
     if (error.status === 403)
       return 'Could not securely submit this request. Refresh the page and try again.';

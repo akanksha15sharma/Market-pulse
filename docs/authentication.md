@@ -265,3 +265,13 @@ handling. It sends no real emails and uses no production records or credentials.
 Screenshots are retained in the printed artifact folder; the runner removes only
 its disposable Chrome profile. Existing notification end-to-end browser helpers
 also fill confirmation fields and explicitly select submit buttons.
+
+Email verification now uses the same `AuthPanel` as the other four authentication
+pages. Missing/malformed tokens never submit; verification still requires an
+explicit user action and the existing CSRF-protected endpoint. An in-flight lock
+prevents duplicate requests, failures are sanitized, and expiry guidance links
+back to Account. Tokens remain in the shared fragment/memory flow. Password
+confirmation updates when the original password changes; untouched typing skips
+unnecessary schema parses and React state updates. Password visibility controls
+have 44px touch targets and distinct confirmation labels. The auth browser suite
+covers all five layouts in both themes, including these verification cases.

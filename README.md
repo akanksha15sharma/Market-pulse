@@ -1,77 +1,95 @@
 # MarketPulse
 
-A public cryptocurrency and stock market tracker built with React 19, TypeScript,
-Vite, Express 5, Prisma 7 and PostgreSQL 17. Production market displays use official
-TradingView widgets with attribution, explicit instruments and feed-delay disclosures.
-Native prices and price alerts are unavailable pending an authorized free source.
-Existing accounts, watchlists, asset IDs and alert records are preserved.
+A public stock and cryptocurrency tracker with genuine TradingView market displays,
+private watchlists, account activity notifications, and secure account management.
+Built with React, TypeScript, Express, Prisma, and PostgreSQL.
 
-See the [B–D implementation and deployment report](docs/implementation-bcd.md) for
-current behavior, verified permissions, test results, limitations and rollout steps.
-A1–A3 documents remain historical scope, research and baseline evidence.
+**Live application:** [market-pulse-five-sand.vercel.app](https://market-pulse-five-sand.vercel.app/)
+
+The live site and this repository may be on different commits: releases are deployed
+manually. This README describes the current code, not a fresh production audit.
 
 ## Features
 
-- **Markets:** 10 curated cryptocurrencies and 5 stocks, official market overview, search, type
-  filters, and sorting. Star favorites and filter them; favorites stay in this
-  browser through refreshes using localStorage.
-- **Asset details:** catalog information and official interactive TradingView historical charts. Source availability, market sessions and delays vary by instrument.
-- **Private watchlists:** create, rename, and delete up to five account-owned lists,
-  with up to 20 assets each. Saved in PostgreSQL, separate from browser favorites.
-- **Price alerts:** saved targets and history remain manageable; production creation, rearming and evaluation are blocked until native data rights are verified.
-- **Accounts:** registration, sign-in, session revocation, signed CSRF tokens,
-  password hashing, validation, ownership checks, and persistent rate limits.
-- **Reliable data presentation:** cached observations remain visible during refresh
-  failures; loading, pending, stale, unavailable, real, and simulated states are
-  labeled. Keyboard navigation and responsive table scrolling are supported.
+- **Market dashboard:** a curated catalog of 10 cryptocurrencies and 5 stocks,
+  responsive asset cards, search, asset-type filters, alphabetical sorting, and
+  browser-local favorites.
+- **Genuine market displays:** official TradingView overview and interactive asset
+  charts, verified symbol mappings, source attribution, and delay/privacy disclosures.
+  No widget data is scraped or used for backend calculations.
+- **Private watchlists:** up to five account-owned lists and 20 assets per list;
+  create, rename, delete, add/remove assets, and open their market charts.
+- **Notifications:** genuine account/watchlist activity, cursor-paginated history,
+  unread counts, read/unread controls, mark-all-as-read, and preferences. APIs and
+  producers are controlled by a server-side flag that defaults off.
+- **Accounts:** registration, sign-in/out, email verification, password reset, and
+  session revocation. All five authentication pages use dashboard styling, inline
+  validation, accessible feedback, and dark/light themes. Password forms support
+  show/hide controls, password managers, and client-only confirmation fields.
+- **Account email:** Brevo HTTPS delivery is implemented for verification/recovery;
+  Mailpit remains a local-only inbox. Production delivery requires verified sender
+  setup, transactional sending approval, and private backend credentials.
+- **Responsive interface:** desktop/mobile navigation, profile dropdown, persisted
+  theme preference, keyboard focus indicators, loading/retry and unavailable states.
 
-CoinPaprika is the active, keyless crypto provider and the default mode. Stocks
-always use simulated data. Historical availability depends on the provider: a
-missing real series stays unavailable, with no simulated replacement. Browser
-prices refresh every 60 seconds while visible; provider refreshes are separately
-budgeted. See [market data](docs/live-crypto.md).
+**Native prices, native historical observations, and price alerts are unavailable
+in production until suitable data permissions are confirmed.** Existing alert
+records remain manageable; creation, rearming, and evaluation are blocked. Charts
+never trigger alerts, and provider failures never fall back to invented prices.
 
-Production account email delivery is **not implemented**. Local verification and
-password-reset emails use Mailpit; hosted email must remain disabled. Alerts are
-in-app records, with no production email notifications or continuous-availability
-guarantee. Portfolios and trade execution are not implemented.
+## Architecture
 
-## Project layout
+```mermaid
+flowchart LR
+  User[Browser] --> Web[React SPA on Vercel]
+  Web -->|Same-origin /api/v1 requests and Vercel rewrite| API[Express API on Render]
+  API -->|Prisma and PostgreSQL| DB[(Neon)]
+  User -->|Official embedded displays| TV[TradingView]
+  API -->|HTTPS account email when configured| Brevo[Brevo]
+  Brevo --> Inbox[User inbox]
+```
 
-| Location                   | Purpose                                                          |
-| -------------------------- | ---------------------------------------------------------------- |
-| `apps/web`                 | React SPA, market pages, accounts, watchlists, alerts, web tests |
-| `apps/api`                 | Express API, bounded market worker, Prisma schema and migrations |
-| `packages/contracts`       | Shared Zod validation and TypeScript API contracts               |
-| `scripts`                  | Development process supervision and web test runner              |
-| `.github/workflows/ci.yml` | Builds, checks, migrations, seeding, isolated database tests     |
-| `docs`                     | Deployment, database, feature, and architecture documentation    |
+Vercel serves the SPA and proxies `/api/*` to Render. The API owns authentication,
+validation, authorization, watchlists, notifications, and database access. Shared
+Zod schemas define frontend/backend contracts. Notification producers write in the
+same transaction as successful account/watchlist operations, with deduplication
+and preference checks. Private responses are not cached by the frontend/proxy.
+
+TradingView runs directly in the browser, separately from the API. Production
+native market ingestion and alert evaluation remain disabled. Historical provider,
+worker, and simulated fixtures exist only for isolated development/testing; their
+presence does not authorize production data use.
+
+| Path                       | Purpose                                                                     |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `apps/web/src`             | React pages, routing, themed components and API client                      |
+| `apps/api/src`             | Express routes, services, repositories, authentication and mailer           |
+| `apps/api/prisma`          | Database schema, additive migrations and idempotent catalog seed            |
+| `packages/contracts`       | Shared Zod validation and TypeScript contracts                              |
+| `scripts`                  | Development processes and isolated test/browser runners                     |
+| `docs`                     | Architecture, provider-rights research, feature guides and release runbooks |
+| `.github/workflows/ci.yml` | Checks and disposable database integration tests; no deployment             |
 
 ## Local setup
 
-Use Node **22.12 or later within Node 22** (`.nvmrc` selects 22), npm 9 or later,
-and Docker with Compose. Run these commands from the project root. If Node is
-managed with nvm, run `nvm use` first.
+Use Node **22.12+ within Node 22**, npm **9+**, and Docker with Compose. `.nvmrc`
+selects Node 22. The committed Compose environment uses PostgreSQL 17; production
+Neon has been operated with PostgreSQL 18. Use matching/newer compatible PostgreSQL
+client tools for backups and restore testing.
+
+From the repository root:
 
 ```sh
+nvm use # if Node is managed with nvm
 npm ci
-```
-
-Create environment files only if they do not already exist; preserve existing
-credentials and settings:
-
-```sh
 cp -n .env.example .env
 cp -n apps/api/.env.example apps/api/.env
 ```
 
-The root `.env` configures local Compose credentials and the PostgreSQL port.
-`apps/api/.env` configures the API, Prisma commands, and worker. Workspace scripts
-run in their workspace directory. Match the database credentials and port in both
-files. The browser uses relative `/api/v1` URLs; Vite proxies these to the API in
-development. Use `127.0.0.1` consistently with `APP_ORIGIN` to avoid origin failures.
-
-Start local dependencies, validate the schema, and initialize your **local** database:
+Preserve existing environment files. Root `.env` configures Compose; API `.env`
+configures the backend and Prisma. Match their local database credentials/port.
+**Before the database commands below, confirm that both API database URLs point
+only to your local development database, never Neon or another production host.**
 
 ```sh
 npm run db:up
@@ -83,21 +101,88 @@ npm run db:seed
 npm run dev
 ```
 
-`db:deploy` applies committed migrations. Seeding upserts the supported catalog;
-it creates no accounts or prices and can be rerun. For creating a new migration
-on a development database, use `npm run db:migrate -w @marketpulse/api -- --name descriptive_change`.
-Never use development migrations or resets against production data.
+`db:deploy` applies committed migrations. The seed atomically upserts catalog
+metadata without creating users, observations, or notifications. Re-running it
+does not duplicate assets. Legacy stock seed flags do not mean public charts use
+simulated prices. Never seed, reset, or migrate production without explicit
+approval and a verified backup.
 
-- Web: <http://127.0.0.1:5173>
-- API liveness: <http://127.0.0.1:3001/api/v1/health/live>
-- API database readiness: <http://127.0.0.1:3001/api/v1/health/ready>
-- Local Mailpit inbox: <http://127.0.0.1:8025>
+| Local service          | Address                                     |
+| ---------------------- | ------------------------------------------- |
+| Frontend               | <http://127.0.0.1:5173>                     |
+| API liveness           | <http://127.0.0.1:3001/api/v1/health/live>  |
+| API database readiness | <http://127.0.0.1:3001/api/v1/health/ready> |
+| Mailpit inbox          | <http://127.0.0.1:8025>                     |
 
-Prices can initially be unavailable until a market request activates the worker
-and a provider fetch completes. Set `CRYPTO_DATA_MODE=demo` for deterministic,
-offline demonstrations. See [environment and deployment settings](docs/deployment.md#environment).
+Vite proxies relative `/api/v1` requests to the local API. Keep `127.0.0.1` and
+`APP_ORIGIN` consistent; `localhost` is a different browser origin. Public charts
+need network access to TradingView. Local Mailpit captures messages without sending
+real email. The verification action starts from Account after registration.
 
-## Checks and tests
+## Configuration and deployment
+
+Use [`apps/api/.env.example`](apps/api/.env.example) as the configuration reference.
+Important backend settings:
+
+| Variable                | Purpose                                                                 |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `DATABASE_URL`          | Application PostgreSQL connection; keep server-only                     |
+| `DIRECT_DATABASE_URL`   | Optional separate migration connection; otherwise database URL fallback |
+| `APP_ORIGIN`            | Exact frontend origin; production requires HTTPS with no trailing slash |
+| `CSRF_SECRET`           | Stable secret of at least 64 characters in production                   |
+| `HOST` / `PORT`         | Bind address/port; Render needs `0.0.0.0` and its assigned port         |
+| `TRUSTED_PROXIES`       | Explicit trusted proxy IPs/CIDRs; never blanket trust                   |
+| `NOTIFICATIONS_ENABLED` | Exact `true`/`false`, defaults `false`; gates APIs and event producers  |
+| `EMAIL_MODE`            | `disabled` by default; `mailpit` locally or `brevo` for real delivery   |
+| `BREVO_API_KEY`         | Private API key required only in Brevo mode                             |
+| `EMAIL_FROM`            | Verified sender address required in Brevo mode                          |
+| `MAILPIT_URL`           | Local loopback Mailpit HTTP URL; production rejects Mailpit mode        |
+
+Store production secrets only in Render's backend environment. Never commit keys,
+DSNs, passwords or tokens, and never expose them as `VITE_*` variables. Keep the
+production origin restricted to the intended Vercel domain. Both notification
+and email configuration changes require a backend restart/deployment.
+
+The existing deployment is Vercel + Render + Neon. Vercel's committed configuration
+disables automatic Git deployments; keep Render Auto-Deploy disabled for the
+manual release workflow. GitHub pushes still run CI. Do not infer deployed commit
+identity from the latest GitHub commit.
+
+Build with `npm run build`. The backend's `npm start` runs configuration preflight
+before starting Express; it does not apply migrations. Vercel builds the frontend
+using the existing project configuration. For release, backup, migration, feature
+flag enablement, verification and rollback, use the existing
+[notification production runbook](docs/releases/notifications-production.md) and
+[deployment guide](docs/deployment.md). Do not rerun migrations or seeding simply
+because a new frontend release is ready.
+
+## Security and performance
+
+- Server-side validation and ownership checks remain authoritative; frontend
+  validation is for feedback, not access control.
+- Passwords use salted scrypt with bounded hashing concurrency. Production sessions
+  use secure, HttpOnly, SameSite cookies with the `__Host-` prefix.
+- Writes use session-bound signed CSRF tokens, strict origin checks and persistent
+  rate limits. The client serializes CSRF issuance and writes, including cross-tab
+  coordination where browser support exists.
+- Verification/reset tokens are hashed in the database, expire, and are single-use.
+  Email links use fragments, removed from the address bar and retained in memory.
+  Successful password reset revokes sessions. Recovery responses do not disclose
+  account existence; confirmation passwords never reach the API.
+- Forms block duplicate in-flight submissions and never automatically replay
+  credential/recovery writes. Validation does not make per-keystroke API requests;
+  untouched typing avoids unnecessary whole-form validation/rerenders.
+- Catalog requests support bounded retries; quota responses respect server cooldowns.
+  Visible-tab refreshes, request cancellation, shared backend caches for permitted
+  development data, and lightweight components keep unnecessary work bounded.
+
+These controls and regression tests do not constitute a penetration test or a
+high-traffic capacity guarantee. No production credentials or user records are
+needed for the local checks below.
+
+## Checks
+
+Run the standard checks once after final edits:
 
 ```sh
 npm run db:validate
@@ -108,102 +193,64 @@ npm test
 npm run build
 ```
 
-The default test suite covers configuration/preflight, authentication, market
-providers and caching, favorites, chart behavior, watchlists, and alerts. External
-provider requests are mocked. Typecheck and build regenerate the Prisma client;
-they do not apply migrations or connect to PostgreSQL.
+They do not apply production migrations or send real emails. Tests mock external
+providers. Builds/type checks regenerate the Prisma client without changing the
+schema or database. CI additionally exercises migrations, seeding and integration
+flows against disposable local databases.
 
-Database integration tests are separate. They require an explicitly configured,
-local `marketpulse_test` database with all migrations applied; they refuse other
-hostnames or database names. Follow [database test setup](docs/database.md#database-tests),
-then run:
+After building, Chrome-based visual/flow checks are available:
 
 ```sh
-npm run test:db
-npm run test:auth:db
-npm run test:markets:db
-npm run test:watchlists:db
-npm run test:alerts:db
+npm run test:auth:browser
+npm run test:navbar:browser
+npm run test:workspace:browser
 ```
 
-CI performs these steps on disposable local PostgreSQL databases, including two
-seed runs. Run `npm audit --omit=dev` when network access is available, and review
-results before changing dependencies. Do not use forced audit upgrades.
+These serve the compiled frontend on loopback with synthetic API fixtures, check
+actual visibility/contrast and responsive layouts, and save screenshots in the
+printed temporary directory. They do not verify real provider feeds, email inbox
+delivery, or production database behavior. Disposable browser profiles are cleaned
+up; screenshots remain available.
 
-## Production deployment
+Database tests are separate. Use the
+[isolated local runner](docs/notifications-e1.md) and set `MP_TEST_PG_BIN` to reviewed
+local PostgreSQL binaries before `npm run test:integration:local`. The runner
+creates a temporary cluster; never point test settings at production. See
+[database testing](docs/database.md#database-tests). The complete notification
+browser suite is `npm run test:notifications:browser` using that isolated runner.
+For dependency review, run `npm audit --omit=dev` and assess findings before changing
+versions; do not use forced dependency upgrades.
 
-No deployment is performed by these instructions or the current CI workflow.
-Review the [deployment runbook](docs/deployment.md) and the researched
-[$0 hosting plan](docs/free-deployment.md) before approving a release. The free
-profile uses Vercel, Render, Neon, and an optional, disabled-by-default background
-batch; it preserves features but cannot promise immediate or continuous alerts.
+## Current limitations
 
-1. Provide a PostgreSQL database, TLS, secrets, backups, and an HTTPS frontend
-   origin. Set production variables in the host's secret store; keep secrets out
-   of `VITE_*` variables and static artifacts.
-2. Build with the full development toolchain available:
+- Native quotes, native price-history APIs and price alerts remain unavailable in
+  production pending confirmed free public-display/caching/alert rights. No
+  unauthorized APIs, widget extraction or simulated fallback is used.
+- TradingView availability, delays, sessions and instruments depend on its feeds
+  and terms; privacy tools or blocked scripts can prevent embedded charts loading.
+- Free Render/Neon resources can sleep or cold-start. No always-on uptime, instant
+  notification delivery, or missed-crossing recovery is promised. Notifications
+  refresh through the API rather than a realtime push connection.
+- Brevo delivery requires approved transactional sending and a verified sender.
+  A free Gmail sender may be rewritten; custom sender-domain authentication is
+  unavailable without control of a domain. Provider quotas, spam filtering and
+  account restrictions apply. API acceptance does not guarantee Gmail delivery.
+  Email support is implemented; this README does not assert it is enabled or
+  verified on the currently deployed backend. See [email setup](docs/authentication.md).
+- There is no email notification channel for watchlist activity, portfolio
+  accounting, trading, paid market feed, or multi-factor authentication.
+- Public-chart data is not stored as native API observations. Browser favorites
+  are device/browser-local; watchlists and notification preferences belong to the
+  signed-in account. A database backup/restore process remains an operator duty.
 
-   ```sh
-   npm ci --include=dev
-   npm run build
-   npm run production:check
-   ```
+## Further documentation
 
-   `production:check` requires `NODE_ENV=production`, the exact HTTPS `APP_ORIGIN`,
-   a stable `CSRF_SECRET`, and valid PostgreSQL URLs. It validates configuration
-   only: it makes no database or provider requests and performs no deployment.
-
-3. After release approval and a verified backup, run the database release job once:
-
-   ```sh
-   npm run db:deploy
-   npm run db:status
-   npm run db:seed
-   ```
-
-4. Serve `apps/web/dist` from a static host/reverse proxy with SPA fallback, and
-   route `/api/*` on the **same public origin** to the API. Start the compiled API
-   with `npm start`, which runs the production preflight first. Set `HOST=0.0.0.0`
-   only when the hosting/container network requires it.
-5. Verify readiness, deep links, account sessions, favorites, watchlists, and real
-   and simulated data labels before admitting traffic. Enable a standalone worker
-   with `npm run start:worker` only on an explicitly configured always-on service.
-
-The API does not serve the React build. `vite preview` is a local preview tool,
-not a production server. Sleeping services can miss alert crossings; the application
-does not reconstruct observations from downtime. Public account launches need a
-separate decision on the missing production recovery-email capability.
-
-## Screenshots
-
-No screenshots are bundled yet. Capture them from your running checkout with
-synthetic accounts and `CRYPTO_DATA_MODE=demo`, leaving simulated labels visible.
-Suggested captures:
-
-| Suggested file under `docs/screenshots/` | Capture                                                          |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| `markets-desktop.png`                    | Dashboard, source labels, and starred assets                     |
-| `asset-details.png`                      | Chart, time filters, selected observation, and asset information |
-| `watchlists.png`                         | A synthetic user's list with cached prices                       |
-| `alerts.png`                             | A synthetic target and its eligibility/source explanation        |
-| `markets-mobile.png`                     | A narrow viewport with wrapped navigation and table scrolling    |
-
-Create that directory when adding real captures. Use descriptive alt text and
-relative Markdown links once files exist. Record the viewport and data mode in
-the caption. Hide real names, emails, passwords, tokens, connection strings, and
-browser developer tools. Never remove provenance labels to imply demo data is live.
-
-## Documentation
-
-Start with the [documentation index](docs/README.md), [deployment runbook](docs/deployment.md),
-[database guide](docs/database.md), [authentication](docs/authentication.md),
-[watchlists](docs/watchlists.md), and [alerts](docs/alerts.md). Older phase documents
-record historical decisions and verification; current source and the runbook define
-the implemented environment contract.
-
-## Author and disclaimer
+[Documentation index](docs/README.md) · [Authentication](docs/authentication.md) ·
+[Current market UI](docs/market-ui.md) · [Provider-rights research](docs/provider-permissions-a2.md) ·
+[Implementation and data safeguards](docs/implementation-bcd.md) ·
+[Notification release runbook](docs/releases/notifications-production.md)
 
 Akanksha Sharma — [GitHub](https://github.com/akanksha15sharma).
 
-MarketPulse provides informational market tracking. Public displays can be delayed
-or unavailable; native data and alerts require verified provider permissions. It does not provide investment advice or execute trades.
+MarketPulse is informational research software. Data may be delayed or unavailable;
+it is not investment advice and does not execute trades.

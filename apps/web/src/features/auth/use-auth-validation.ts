@@ -35,19 +35,36 @@ export function useAuthValidation(mode: AuthMode, token = '') {
     )
       return;
     const result = read(event.currentTarget);
-    setErrors((previous) => ({ ...previous, [field]: result.errors[field] }));
+    setErrors((previous) =>
+      previous[field] === result.errors[field]
+        ? previous
+        : { ...previous, [field]: result.errors[field] },
+    );
   }
   function change(event: FormEvent<HTMLFormElement>) {
     if (event.currentTarget.querySelector('fieldset')?.disabled) return;
     const field = (event.target as HTMLInputElement).name as AuthField;
+    const confirmation = event.currentTarget.elements.namedItem(
+      'confirmPassword',
+    ) as HTMLInputElement | null;
+    const checkConfirmation = field === 'password' && !!confirmation?.value;
+    // Untouched fields validate on blur/submit. Avoid a full schema parse and
+    // React update on every keystroke until feedback actually needs refreshing.
+    if (!errors[field] && !errors.confirmPassword && !checkConfirmation) return;
     const result = read(event.currentTarget);
-    setErrors((previous) => ({
-      ...previous,
-      ...(previous[field] ? { [field]: result.errors[field] } : {}),
-      ...(previous.confirmPassword
-        ? { confirmPassword: result.errors.confirmPassword }
-        : {}),
-    }));
+    setErrors((previous) => {
+      const next = {
+        ...previous,
+        ...(previous[field] ? { [field]: result.errors[field] } : {}),
+        ...(previous.confirmPassword || checkConfirmation
+          ? { confirmPassword: result.errors.confirmPassword }
+          : {}),
+      };
+      return previous[field] === next[field] &&
+        previous.confirmPassword === next.confirmPassword
+        ? previous
+        : next;
+    });
   }
   return { errors, validate, blur, change };
 }
