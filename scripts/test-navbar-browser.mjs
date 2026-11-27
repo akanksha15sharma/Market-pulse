@@ -3,14 +3,22 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
-import { readFile, mkdtemp, writeFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { resolve, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 const workspace = process.argv.includes('--workspace');
+const authMode = process.argv.includes('--auth');
+let authFault = 0,
+  holdAuth = false;
+const heldAuth = [],
+  authRequests = [],
+  requestedUrls = [];
 let fixtureState = 'filled';
 const root = resolve('apps/web/dist');
-const artifacts = await mkdtemp(join(tmpdir(), 'marketpulse-navbar-'));
-let signedIn = true,
+const artifacts = await mkdtemp(
+  join(tmpdir(), authMode ? 'marketpulse-auth-' : 'marketpulse-navbar-'),
+);
+let signedIn = !authMode,
   failLogout = false;
 const user = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -69,12 +77,40 @@ const notificationFixture = {
 };
 const writes = [];
 const server = http.createServer(async (req, res) => {
+  requestedUrls.push(req.url);
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/api/')) {
     res.setHeader('Content-Type', 'application/json');
     let body = {};
     if (path.endsWith('/csrf')) body = { csrfToken: 'isolated-token' };
-    else if (path.endsWith('/logout')) {
+    else if (
+      authMode &&
+      req.method === 'POST' &&
+      /^\/api\/v1\/auth\/(login|register|forgot-password|reset-password)$/.test(
+        path,
+      )
+    ) {
+      let raw = '';
+      for await (const chunk of req) raw += chunk;
+      const payload = JSON.parse(raw);
+      authRequests.push({ path, payload });
+      writes.push({ path, csrf: req.headers['x-csrf-token'] });
+      if (holdAuth) await new Promise((done) => heldAuth.push(done));
+      if (authFault) {
+        res.statusCode = authFault;
+        body = { error: 'Private fixture diagnostic' };
+      } else if (path.endsWith('/login') || path.endsWith('/register')) {
+        signedIn = true;
+        body = { user };
+        res.statusCode = path.endsWith('/register') ? 201 : 200;
+      } else if (path.endsWith('/reset-password')) {
+        signedIn = false;
+        body = { message: 'Password reset. Sign in again.' };
+      } else
+        body = {
+          message: 'If the account exists, a reset email will be sent.',
+        };
+    } else if (path.endsWith('/logout')) {
       writes.push({ path, csrf: req.headers['x-csrf-token'] });
       if (failLogout) {
         res.statusCode = 503;
@@ -217,7 +253,7 @@ const deadline = setTimeout(
     chrome.kill('SIGKILL');
     server.close();
   },
-  workspace ? 240_000 : 120_000,
+  workspace || authMode ? 240_000 : 120_000,
 );
 try {
   const target = await send('Target.createTarget', { url: 'about:blank' });
@@ -289,11 +325,13 @@ try {
     })()`);
     assert.ok(
       ratio >= 4.5,
-      `${selector} contrast ${ratio}; ${await evaluate(`JSON.stringify({theme:document.documentElement.dataset.theme,width:innerWidth,color:getComputedStyle(document.querySelector(${JSON.stringify(selector)})).color,bg:getComputedStyle(document.querySelector(${JSON.stringify(selector)})).backgroundColor,panel:getComputedStyle(document.querySelector('.profile-panel')).backgroundColor})`)}`,
+      `${selector} contrast ${ratio}; ${await evaluate(`JSON.stringify({theme:document.documentElement.dataset.theme,width:innerWidth,color:getComputedStyle(document.querySelector(${JSON.stringify(selector)})).color,bg:getComputedStyle(document.querySelector(${JSON.stringify(selector)})).backgroundColor,panel:document.querySelector('.profile-panel') ? getComputedStyle(document.querySelector('.profile-panel')).backgroundColor : null})`)}`,
     );
   }
   const results = [];
-  for (const width of workspace ? [] : [1440, 1280, 1024, 768, 375, 320]) {
+  for (const width of workspace || authMode
+    ? []
+    : [1440, 1280, 1024, 768, 375, 320]) {
     await send(
       'Emulation.setDeviceMetricsOverride',
       { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 },
@@ -439,14 +477,14 @@ try {
       );
     }
   }
+  async function checkControl(selector) {
+    await evaluate(
+      `(async () => { const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw new Error('Missing control');const r=el.getBoundingClientRect();window.scrollTo(0,scrollY+r.top-(innerHeight-r.height)/2);await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))); })()`,
+    );
+    await visible(selector);
+    await contrast(selector);
+  }
   if (workspace) {
-    async function checkControl(selector) {
-      await evaluate(
-        `(async () => { const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw new Error('Missing control');const r=el.getBoundingClientRect();window.scrollTo(0,scrollY+r.top-(innerHeight-r.height)/2);await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))); })()`,
-      );
-      await visible(selector);
-      await contrast(selector);
-    }
     for (const width of [1440, 768, 375, 320]) {
       await send(
         'Emulation.setDeviceMetricsOverride',
@@ -587,38 +625,336 @@ try {
     fixtureState = 'filled';
     user.emailVerified = false;
   }
-  // Desktop sign-out failure keeps the authenticated state; success uses CSRF.
-  await send(
-    'Emulation.setDeviceMetricsOverride',
-    { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false },
-    sessionId,
-  );
-  await send('Page.navigate', { url: `${origin}/account` }, sessionId);
-  await until("!!document.querySelector('.profile-trigger')");
-  failLogout = true;
-  await click('.profile-trigger');
-  await click('.profile-signout');
-  await until("document.body.innerText.includes('Temporary sign-out failure')");
-  await visible('.profile-trigger');
-  assert.equal(signedIn, true);
-  failLogout = false;
-  await click('.profile-signout');
-  await until(
-    "location.pathname === '/login' && document.querySelector('.nav-auth-button')?.getAttribute('href') === '/login'",
-  );
-  assert.equal(signedIn, false);
-  assert.ok(writes.every((write) => write.csrf === 'isolated-token'));
-  assert.equal(
-    await evaluate("!!document.querySelector('.profile-dropdown')"),
-    false,
-  );
+  if (authMode) {
+    const token = 'a'.repeat(64),
+      nextToken = 'b'.repeat(64);
+    const secret = '  Strong local passphrase  ';
+    const navigate = async (path) => {
+      await send('Page.navigate', { url: origin + path }, sessionId);
+      await until("!!document.querySelector('.auth-page h1')");
+    };
+    async function input(selector, text) {
+      await evaluate(
+        `(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.focus();el.select();})()`,
+      );
+      await send('Input.insertText', { text }, sessionId);
+    }
+    const submit = () =>
+      evaluate("document.querySelector('.auth-form').requestSubmit()");
+    async function waitForPosts(count) {
+      for (let i = 0; i < 100 && authRequests.length < count; i++)
+        await new Promise((done) => setTimeout(done, 20));
+      assert.equal(authRequests.length, count);
+    }
+    for (const width of [1440, 768, 375, 320]) {
+      await send(
+        'Emulation.setDeviceMetricsOverride',
+        { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 },
+        sessionId,
+      );
+      for (const theme of ['dark', 'light']) {
+        for (const path of [
+          '/login',
+          '/register',
+          '/forgot-password',
+          `/reset-password#token=${token}`,
+        ]) {
+          await navigate(path);
+          await evaluate(
+            `localStorage.setItem('marketpulse-theme',${JSON.stringify(theme)});window.dispatchEvent(new Event('marketpulse-theme'));`,
+          );
+          await until(
+            `document.documentElement.dataset.theme === ${JSON.stringify(theme)}`,
+          );
+          for (const selector of [
+            '.auth-page h1',
+            '.auth-description',
+            '.auth-field label',
+            '.auth-form input',
+            '.auth-submit',
+            '.auth-footer a',
+          ])
+            await checkControl(selector);
+          if (path !== '/forgot-password') {
+            await checkControl('.password-toggle');
+            await click('.password-toggle');
+            await until(
+              "document.querySelector('input[name=password]').type === 'text'",
+            );
+            assert.equal(
+              await evaluate(
+                "document.querySelector('.password-toggle').getAttribute('aria-pressed')",
+              ),
+              'true',
+            );
+            await click('.password-toggle');
+            await until(
+              "document.querySelector('input[name=password]').type === 'password'",
+            );
+          }
+          assert.equal(
+            await evaluate(
+              'document.documentElement.scrollWidth <= innerWidth',
+            ),
+            true,
+            `Auth overflow ${width} ${theme} ${path}`,
+          );
+          await evaluate('window.scrollTo(0,0)');
+          const dimensions = await send('Page.getLayoutMetrics', {}, sessionId);
+          const shot = await send(
+            'Page.captureScreenshot',
+            {
+              format: 'png',
+              captureBeyondViewport: true,
+              clip: {
+                x: 0,
+                y: 0,
+                width,
+                height: dimensions.cssContentSize.height,
+                scale: 1,
+              },
+            },
+            sessionId,
+          );
+          await writeFile(
+            join(
+              artifacts,
+              `${path.split('#')[0].slice(1)}-${width}-${theme}.png`,
+            ),
+            Buffer.from(shot.data, 'base64'),
+          );
+        }
+        results.push(
+          `${width}px ${theme}: all four auth pages, visible controls, contrast, password toggles and no overflow`,
+        );
+      }
+    }
+    await navigate('/register');
+    let before = authRequests.length;
+    await submit();
+    await until(
+      "document.activeElement?.id === 'displayName' && document.querySelectorAll('.auth-field-error').length === 4",
+    );
+    assert.equal(
+      authRequests.length,
+      before,
+      'Invalid registration never reaches the API',
+    );
+    await input('#displayName', 'Market researcher');
+    await input('#email', 'USER@EXAMPLE.TEST');
+    await input('#password', 'short');
+    await input('#confirmPassword', 'different');
+    await submit();
+    await until(
+      "document.querySelector('#confirmPassword-error')?.textContent.includes('do not match')",
+    );
+    await checkControl('.auth-field-error');
+    await input('#password', secret);
+    await input('#confirmPassword', secret);
+    holdAuth = true;
+    await evaluate(
+      "document.querySelector('.auth-form').requestSubmit();document.querySelector('.auth-form').requestSubmit()",
+    );
+    await until(
+      "document.querySelector('.auth-form').getAttribute('aria-busy') === 'true' && document.querySelector('fieldset').disabled && document.querySelector('.auth-submit').textContent.includes('Creating account')",
+    );
+    await waitForPosts(before + 1);
+    assert.equal(heldAuth.length, 1);
+    holdAuth = false;
+    heldAuth.splice(0).forEach((done) => done());
+    await until(
+      "location.pathname === '/account' && document.querySelector('h1')?.textContent === 'Your account'",
+    );
+    assert.deepEqual(authRequests.at(-1).payload, {
+      email: 'user@example.test',
+      password: secret,
+      displayName: 'Market researcher',
+    });
+    results.push(
+      'Registration: inline validation, first-error focus, confirmation, unchanged password, strict payload, loading and duplicate-submit prevention',
+    );
+
+    signedIn = false;
+    await navigate('/login');
+    await input('#email', 'user@example.test');
+    await input('#password', secret);
+    for (const [status, text] of [
+      [401, 'Invalid email or password'],
+      [429, 'Too many attempts'],
+      [503, 'temporarily unavailable'],
+    ]) {
+      authFault = status;
+      await submit();
+      await until(
+        `document.querySelector('.auth-error')?.textContent.includes(${JSON.stringify(text)}) && !document.querySelector('.auth-submit').disabled`,
+      );
+      await checkControl('.auth-error');
+      assert.equal(
+        await evaluate(
+          "document.body.innerText.includes('Private fixture diagnostic')",
+        ),
+        false,
+      );
+    }
+    authFault = 0;
+    await send(
+      'Network.emulateNetworkConditions',
+      {
+        offline: true,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      },
+      sessionId,
+    );
+    await submit();
+    await until(
+      "document.querySelector('.auth-error')?.textContent.includes('connection')",
+    );
+    await send(
+      'Network.emulateNetworkConditions',
+      {
+        offline: false,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      },
+      sessionId,
+    );
+    await submit();
+    await until("location.pathname === '/account'");
+    results.push(
+      'Sign-in: safe invalid credentials, rate-limit/server/offline feedback, retry and successful navigation',
+    );
+
+    const messages = [];
+    for (const email of ['user@example.test', 'unknown@example.test']) {
+      await navigate('/forgot-password');
+      before = authRequests.length;
+      await submit();
+      await until("!!document.querySelector('#email-error')");
+      assert.equal(authRequests.length, before);
+      await input('#email', email);
+      await submit();
+      await until("!!document.querySelector('.auth-result [role=status]')");
+      messages.push(
+        await evaluate(
+          "document.querySelector('.auth-result [role=status]').textContent",
+        ),
+      );
+      assert.deepEqual(authRequests.at(-1).payload, { email });
+    }
+    assert.equal(
+      messages[0],
+      messages[1],
+      'Recovery never reveals account existence',
+    );
+    results.push(
+      'Recovery: invalid email blocked, strict email-only payload and identical known/unknown account response',
+    );
+
+    await navigate('/reset-password');
+    await until("!!document.querySelector('.auth-invalid-link')");
+    assert.equal(
+      await evaluate("!!document.querySelector('input[name=password]')"),
+      false,
+    );
+    await navigate('/reset-password#token=malformed-private-token');
+    await until(
+      "!!document.querySelector('.auth-invalid-link') && location.hash === ''",
+    );
+    assert.equal(
+      await evaluate(
+        "document.body.innerText.includes('malformed-private-token')",
+      ),
+      false,
+    );
+    await navigate(`/reset-password#token=${token}`);
+    await until(
+      "!!document.querySelector('input[name=password]') && location.hash === ''",
+    );
+    await input('#password', secret);
+    await input('#confirmPassword', 'different');
+    before = authRequests.length;
+    await submit();
+    await until("!!document.querySelector('#confirmPassword-error')");
+    assert.equal(authRequests.length, before);
+    await input('#confirmPassword', secret);
+    authFault = 400;
+    await submit();
+    await until(
+      "document.querySelector('.auth-error')?.textContent.includes('Invalid or expired')",
+    );
+    authFault = 0;
+    await evaluate(`location.hash='token=${nextToken}'`);
+    await until(
+      "!!document.querySelector('input[name=password]') && document.querySelector('#password').value === '' && location.hash === '' && !document.querySelector('.auth-error')",
+    );
+    await input('#password', secret);
+    await input('#confirmPassword', secret);
+    await submit();
+    await until(
+      "document.querySelector('.auth-result [role=status]')?.textContent.includes('Password reset')",
+    );
+    assert.deepEqual(authRequests.at(-1).payload, {
+      token: nextToken,
+      password: secret,
+    });
+    assert.equal(
+      await evaluate("!!document.querySelector('input[name=password]')"),
+      false,
+    );
+    assert.ok(
+      requestedUrls.every(
+        (url) =>
+          !url.includes(token) &&
+          !url.includes(nextToken) &&
+          !url.includes('malformed-private-token'),
+      ),
+      'Recovery secrets never enter request URLs',
+    );
+    assert.ok(writes.every((write) => write.csrf === 'isolated-token'));
+    results.push(
+      'Reset: missing/malformed/expired links, confirmation, same-route fresh-link reset, strict token/password payload, CSRF, URL secrecy and success state',
+    );
+  }
+  if (!authMode) {
+    // Desktop sign-out failure keeps the authenticated state; success uses CSRF.
+    await send(
+      'Emulation.setDeviceMetricsOverride',
+      { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false },
+      sessionId,
+    );
+    await send('Page.navigate', { url: `${origin}/account` }, sessionId);
+    await until("!!document.querySelector('.profile-trigger')");
+    failLogout = true;
+    await click('.profile-trigger');
+    await click('.profile-signout');
+    await until(
+      "document.body.innerText.includes('Temporary sign-out failure')",
+    );
+    await visible('.profile-trigger');
+    assert.equal(signedIn, true);
+    failLogout = false;
+    await click('.profile-signout');
+    await until(
+      "location.pathname === '/login' && document.querySelector('.nav-auth-button')?.getAttribute('href') === '/login'",
+    );
+    assert.equal(signedIn, false);
+    assert.ok(writes.every((write) => write.csrf === 'isolated-token'));
+    assert.equal(
+      await evaluate("!!document.querySelector('.profile-dropdown')"),
+      false,
+    );
+  }
   assert.deepEqual(exceptions, []);
   console.log(
     JSON.stringify(
       {
         results,
-        signOut:
-          'failure preserved session; success retained CSRF and signed-out navigation',
+        signOut: authMode
+          ? 'Covered by the existing navbar suite'
+          : 'failure preserved session; success retained CSRF and signed-out navigation',
         artifacts,
       },
       null,
@@ -632,6 +968,11 @@ try {
   await new Promise((done) => server.close(done));
   chrome.stdio[3].destroy();
   chrome.stdio[4].destroy();
-  if (chrome.exitCode === null && chrome.signalCode === null)
+  if (chrome.exitCode === null && chrome.signalCode === null) {
+    const exited = new Promise((done) => chrome.once('exit', done));
     chrome.kill('SIGTERM');
+    await exited;
+  }
+  // The runner owns this fresh profile. Retain screenshots, discard only its cache.
+  await rm(join(artifacts, 'profile'), { recursive: true, force: true });
 }

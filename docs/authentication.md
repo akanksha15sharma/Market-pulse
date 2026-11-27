@@ -227,3 +227,41 @@ controls, and successful/failed CSRF-protected sign-out at desktop, tablet, and
 mobile widths in both themes. Screenshots are saved in the printed temporary
 artifact directory. This test does not establish live backend authentication or
 market-provider correctness.
+
+### Dashboard-style account forms
+
+Sign-in, registration, forgot-password, and reset-password pages share a themed
+`AuthPanel`, labeled fields, inline errors, password visibility controls, and
+explicit loading/success states. The same dashboard/workspace colors apply in
+light and dark mode, including mobile layouts.
+
+Validation uses the existing shared authentication schemas. Email normalization
+and password length rules are unchanged; passwords are never trimmed. Forms use
+`noValidate` so understandable, linked inline errors replace browser-specific
+validation popups. The server still validates every request. Invalid submission
+focuses the first invalid field, and blur/change feedback helps correct errors.
+Registration and password reset require a matching client-only confirmation;
+`confirmPassword` is never included in API payloads.
+
+Password controls start hidden, preserve password-manager autocomplete, and expose
+an accessible show/hide button. Credentials are not persisted in browser storage
+or logged. Pending requests disable the fieldset and submit control; a synchronous
+lock prevents duplicate submissions. Errors distinguish offline, rate-limited,
+invalid-credentials, and expired-link cases without displaying internal failures.
+Requests continue through the existing CSRF-protected API client with no automatic
+credential/recovery retries. Forgot-password success remains identical for known
+and unknown accounts. Reset tokens remain in the existing fragment/memory flow,
+are removed from the address bar, and never become request URL parameters.
+Malformed/missing links offer recovery; successful resets remove the password form
+and require sign-in, preserving server-side token consumption/session revocation.
+
+Run `npm run test:web`, `npm run lint`,
+`npm run typecheck -w @marketpulse/web`, and
+`npm run build -w @marketpulse/web`. After building, `npm run test:auth:browser`
+uses local API fixtures to check all four pages at desktop/tablet/mobile widths
+in both themes, visibility/contrast, confirmation, first-error focus, visibility
+toggles, duplicate submissions, loading, safe errors, recovery privacy, and token
+handling. It sends no real emails and uses no production records or credentials.
+Screenshots are retained in the printed artifact folder; the runner removes only
+its disposable Chrome profile. Existing notification end-to-end browser helpers
+also fill confirmation fields and explicitly select submit buttons.

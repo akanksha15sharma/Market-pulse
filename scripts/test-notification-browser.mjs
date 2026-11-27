@@ -195,6 +195,18 @@ try {
       `(()=>{const input=document.querySelector(${JSON.stringify(selector)});input.focus();input.select();})()`,
     );
     await send('Input.insertText', { text }, sessionId);
+    // Registration/reset confirmation is client-only; exercise the actual UI.
+    if (
+      selector === 'input[name=password]' &&
+      (await evaluate(
+        "!!document.querySelector('input[name=confirmPassword]')",
+      ))
+    ) {
+      await evaluate(
+        "(()=>{const confirmation=document.querySelector('input[name=confirmPassword]');confirmation.focus();confirmation.select()})()",
+      );
+      await send('Input.insertText', { text }, sessionId);
+    }
   }
   async function ready() {
     await until(
@@ -220,7 +232,7 @@ try {
   await input('input[name=displayName]', 'E4 Local Browser');
   await input('input[name=email]', emails[0]);
   await input('input[name=password]', 'a secure local browser passphrase');
-  await evaluate("document.querySelector('form button').click()");
+  await evaluate("document.querySelector('form button[type=submit]').click()");
   await until(
     "location.pathname==='/account' && !!document.querySelector('.notification-badge')",
   );
@@ -588,7 +600,7 @@ try {
     'input[name=password]',
     'another secure local browser passphrase',
   );
-  await evaluate("document.querySelector('form button').click()");
+  await evaluate("document.querySelector('form button[type=submit]').click()");
   await until("location.pathname==='/account'");
   for (
     let i = 0;

@@ -455,3 +455,134 @@ test('protected API 401 signals session expiry while incorrect login does not', 
     else Reflect.deleteProperty(globalThis, 'window');
   }
 });
+
+test('shared auth validation keeps API payloads strict and passwords unchanged', async () => {
+  const { validateAuthForm } =
+    await import('../src/features/auth/form-validation');
+  const password = '  private passphrase  ';
+  const input = {
+    email: '  USER@EXAMPLE.TEST ',
+    displayName: '  User  ',
+    password,
+    confirmPassword: password,
+  };
+  const registration = validateAuthForm('register', input);
+  assert.deepEqual(registration.errors, {});
+  assert.deepEqual(registration.data, {
+    email: 'user@example.test',
+    displayName: 'User',
+    password,
+  });
+  assert.deepEqual(validateAuthForm('login', input).data, {
+    email: 'user@example.test',
+    password,
+  });
+  assert.deepEqual(validateAuthForm('forgot', input).data, {
+    email: 'user@example.test',
+  });
+  const token = 'a'.repeat(64);
+  assert.deepEqual(validateAuthForm('reset', input, token).data, {
+    token,
+    password,
+  });
+  assert.ok(!JSON.stringify(registration.data).includes('confirmPassword'));
+  assert.equal(
+    validateAuthForm('register', { ...input, confirmPassword: 'different' })
+      .data,
+    undefined,
+  );
+  assert.match(
+    validateAuthForm('reset', { ...input, confirmPassword: '' }, token).errors
+      .confirmPassword!,
+    /Confirm/,
+  );
+  assert.match(
+    validateAuthForm('reset', input, 'malformed-private-token').errors.token!,
+    /missing or invalid/,
+  );
+});
+
+test('auth validation returns understandable field errors with existing length rules', async () => {
+  const { validateAuthForm } =
+    await import('../src/features/auth/form-validation');
+  const invalid = validateAuthForm('register', {
+    email: 'bad',
+    displayName: ' ',
+    password: 'short',
+    confirmPassword: 'other',
+  });
+  assert.match(invalid.errors.email!, /valid email/);
+  assert.match(invalid.errors.displayName!, /1–100/);
+  assert.match(invalid.errors.password!, /12–128/);
+  assert.match(invalid.errors.confirmPassword!, /do not match/);
+  for (const size of [12, 128]) {
+    const password = 'a'.repeat(size);
+    assert.ok(
+      validateAuthForm('register', {
+        email: 'u@example.test',
+        displayName: 'U',
+        password,
+        confirmPassword: password,
+      }).data,
+    );
+  }
+  assert.equal(
+    validateAuthForm('login', {
+      email: 'u@example.test',
+      password: 'a'.repeat(129),
+    }).data,
+    undefined,
+  );
+  assert.ok(
+    validateAuthForm('login', { email: 'u@example.test', password: 'a' }).data,
+  );
+});
+
+test('auth errors explain network, rate limits and expiry without exposing internal details', async () => {
+  const { authFailureMessage } =
+    await import('../src/features/auth/form-validation');
+  assert.match(
+    authFailureMessage(new ApiError(0, 'private-token'), 'login'),
+    /connection/,
+  );
+  assert.match(
+    authFailureMessage(new ApiError(429, 'private-token'), 'forgot'),
+    /Too many attempts/,
+  );
+  assert.equal(
+    authFailureMessage(new ApiError(401, 'private-email'), 'login'),
+    'Invalid email or password.',
+  );
+  assert.match(
+    authFailureMessage(new ApiError(400, 'private-token'), 'reset'),
+    /Invalid or expired/,
+  );
+  for (const error of [
+    new Error('private-token'),
+    new ApiError(503, 'private-token'),
+    new ApiError(403, 'private-token'),
+  ])
+    assert.doesNotMatch(authFailureMessage(error, 'register'), /private-token/);
+});
+
+test('password controls have explicit non-submit buttons, manager support and linked errors', async () => {
+  const { PasswordField } = await import('../src/features/auth/PasswordField');
+  const html = renderToStaticMarkup(
+    <PasswordField newPassword error="Use 12–128 characters." />,
+  );
+  assert.match(html, /type="password"/);
+  assert.match(html, /autoComplete="new-password"/);
+  assert.match(html, /aria-invalid="true"/);
+  assert.match(html, /aria-describedby="password-hint password-error"/);
+  assert.match(html, /type="button"/);
+  assert.match(html, /aria-label="Show password"/);
+  assert.match(html, /aria-controls="password"/);
+  const register = renderToStaticMarkup(
+    <MemoryRouter>
+      <AuthForm mode="register" />
+    </MemoryRouter>,
+  );
+  assert.match(register, /name="confirmPassword"/);
+  assert.match(register, /type="submit"/);
+  assert.match(register, /noValidate=""/);
+});

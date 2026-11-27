@@ -1,7 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { resetPasswordSchema } from '@marketpulse/contracts';
+import { tokenSchema } from '@marketpulse/contracts';
 import { useLinkToken } from '../features/auth/use-link-token';
+import { AuthPanel, SubmitButton } from '../features/auth/AuthPanel';
+import { PasswordField } from '../features/auth/PasswordField';
+import { useAuthValidation } from '../features/auth/use-auth-validation';
+import { authFailureMessage } from '../features/auth/form-validation';
 import { api } from '../lib/api-client';
 export function ResetPasswordPage() {
   const link = useLinkToken();
@@ -11,66 +15,89 @@ function ResetPasswordForm({ token }: { token: string }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const validation = useAuthValidation('reset', token);
+  const validLink = tokenSchema.safeParse(token).success;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const password = new FormData(event.currentTarget).get('password');
-    const parsed = resetPasswordSchema.safeParse({ token, password });
-    if (!parsed.success) {
-      setError('Use a valid reset link and a password of 12–128 characters.');
+    if (pending.current || !validLink) return;
+    setError('');
+    const result = validation.validate(event.currentTarget);
+    if (!result.data) {
+      setError('Please review the highlighted fields.');
       return;
     }
+    pending.current = true;
     setBusy(true);
-    setError('');
     try {
-      const result = await api<{ message: string }>('/auth/reset-password', {
-        method: 'POST',
-        body: parsed.data,
-      });
-      setMessage(result.message);
+      await api('/auth/reset-password', { method: 'POST', body: result.data });
+      setMessage('Password reset. Sign in again with your new password.');
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Try again');
+      setError(authFailureMessage(failure, 'reset'));
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
   return (
-    <section className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold">Choose a new password</h1>
-      {!message && (
+    <AuthPanel
+      title="Choose a new password"
+      description="Use a password you haven’t used elsewhere. Your existing sessions will end after a successful reset."
+      footer={
+        <>
+          <Link to="/login">Sign in</Link>
+          <Link to="/forgot-password">Request a new reset link</Link>
+        </>
+      }
+    >
+      {message ? (
+        <div className="auth-result">
+          <h2>Your password is updated</h2>
+          <p role="status">{message}</p>
+        </div>
+      ) : !validLink ? (
+        <div className="auth-result auth-invalid-link" role="alert">
+          <h2>A new reset link is needed</h2>
+          <p>
+            This reset link is missing or invalid. Open the link from your
+            email, or request a new one.
+          </p>
+        </div>
+      ) : (
         <form
-          className="mt-8 space-y-5"
+          className="auth-form"
+          noValidate
+          aria-busy={busy}
           onSubmit={(event) => {
             void submit(event);
           }}
+          onBlur={validation.blur}
+          onChange={(event) => {
+            validation.change(event);
+            setError('');
+          }}
         >
-          <label className="block">
-            New password
-            <input
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              required
+          <fieldset disabled={busy}>
+            <legend className="sr-only">New password details</legend>
+            <PasswordField newPassword error={validation.errors.password} />
+            <PasswordField
+              confirm
+              newPassword
+              error={validation.errors.confirmPassword}
             />
-          </label>
-          <button disabled={busy || !token} className="primary-button">
-            {busy ? 'Please wait…' : 'Reset password'}
-          </button>
+            {error && (
+              <p role="alert" className="auth-error">
+                {error}
+              </p>
+            )}
+            <SubmitButton
+              busy={busy}
+              idle="Reset password"
+              pending="Resetting password…"
+            />
+          </fieldset>
         </form>
       )}
-      {!token && <p className="mt-4">Open the reset link from your email.</p>}
-      <p role="status" className="mt-4 text-teal-300">
-        {message}
-      </p>
-      {error && (
-        <p role="alert" className="text-rose-300">
-          {error}
-        </p>
-      )}
-      <Link to="/login" className="mt-6 inline-block text-teal-300">
-        Sign in
-      </Link>
-    </section>
+    </AuthPanel>
   );
 }
