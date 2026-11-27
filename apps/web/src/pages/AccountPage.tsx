@@ -34,8 +34,8 @@ export function AccountPage() {
         {!user.emailVerified && (
           <>
             <p className="mt-2 text-sm text-slate-400">
-              Request a verification link. Local development emails appear in
-              Mailpit when configured.
+              Request a verification link sent to your email address. Check your
+              spam folder if it does not arrive.
             </p>
             <button
               disabled={busy}

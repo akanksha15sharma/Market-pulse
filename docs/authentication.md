@@ -129,3 +129,65 @@ Production account email is intentionally disabled pending that integration. No 
 OAuth, password-change settings or market endpoints are added. Full browser event
 and end-to-end testing remains a later hardening step; current frontend tests cover
 form rendering and protected loader behavior.
+
+### Production account email: Brevo HTTPS API
+
+The existing resend-verification and password-reset flows use the same one-time,
+hashed, expiring tokens. Registration still succeeds independently; users request
+verification from their Account page. No database migration is needed.
+
+Set these **Render backend environment variables only** when deploying the email
+integration manually (do not change Vercel variables):
+
+```dotenv
+EMAIL_MODE=brevo
+BREVO_API_KEY=<your private Brevo API key>
+EMAIL_FROM=<your verified sender email address>
+APP_ORIGIN=https://market-pulse-five-sand.vercel.app
+```
+
+Keep the existing CSRF secret, database URLs, trusted proxies, and notification flag
+unchanged. `MAILPIT_URL` is unused in Brevo mode. Missing key/sender fails startup.
+Never commit the key, put it in a `VITE_` variable, paste it into chat, or log email
+bodies, API credentials, or token links. Rotate a key in Brevo if exposed.
+
+The backend calls `POST https://api.brevo.com/v3/smtp/email` with an `api-key`
+header, verified sender, single recipient, subject, and plain-text content. It uses
+HTTPS (not SMTP), a five-second timeout, and rejects redirects. HTTP 201 means
+provider acceptance, **not guaranteed inbox delivery**. No automatic retries are
+made because an ambiguous timeout could otherwise send duplicates. Provider
+errors, rejected senders, quota exhaustion, and network failures are sanitized.
+Verification failures return a generic 503 and delete the newly created token.
+Password-reset requests retain the same generic response for known and unknown
+accounts, even on delivery failure, to prevent account discovery; failed tokens
+are deleted. No token or provider response is returned to the browser.
+
+Brevo Free currently allows 300 sends/day shared across email activity. A verified
+Gmail sender can be subject to Brevo sender rewriting; transactional activation,
+account-specific restrictions, and delivery to Gmail must be confirmed with a
+real approved test. Owning no domain means MarketPulse cannot configure its own
+sender-domain authentication. Do not promise inbox delivery or branded sender
+addresses. Do not upgrade to paid services automatically.
+
+After manual deployment, request a verification link and password reset for your
+own test account; check Gmail inbox/spam and Brevo transactional delivery logs.
+Verify both links work once, an expired/reused link is rejected, and reset revokes
+sessions. Never share the links. Live delivery remains unverified until that test.
+To disable delivery, set `EMAIL_MODE=disabled` and redeploy the same release;
+account access and existing records remain intact. Keep `EMAIL_MODE=mailpit` with
+the loopback `MAILPIT_URL` for local development; production rejects Mailpit.
+
+Offline checks: `npm run test:auth`, `npm run test:config`, `npm run test:web`,
+`npm run lint`, `npm run typecheck`, and `npm run build`. Transport tests use dummy
+credentials and injected fetch; no real emails are sent.
+
+References: [Brevo API](https://developers.brevo.com/reference/send-transac-email),
+[free limits](https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan),
+[sender requirements](https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders).
+
+Integration validation (2026-11-28): 16 authentication/email tests, six runtime
+configuration tests, and 75 frontend regressions passed. Lint, workspace type
+checks, production builds, and formatting checks passed. Tests used injected
+transports/repository doubles; no production database or live email provider was
+accessed. Gmail delivery, sender rewriting, and account activation remain live
+manual verification steps after approved deployment.

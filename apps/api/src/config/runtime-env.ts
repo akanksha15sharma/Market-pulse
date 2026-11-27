@@ -54,7 +54,9 @@ export function parseRuntimeEnv(input: Record<string, string | undefined>) {
         .enum(['true', 'false'])
         .default('false')
         .transform((value) => value === 'true'),
-      EMAIL_MODE: z.enum(['disabled', 'mailpit']).default('disabled'),
+      EMAIL_MODE: z.enum(['disabled', 'mailpit', 'brevo']).default('disabled'),
+      BREVO_API_KEY: z.string().trim().min(1).optional(),
+      EMAIL_FROM: z.email().optional(),
       MAILPIT_URL: z.url().default('http://127.0.0.1:8025'),
     })
     .parse(input);
@@ -72,6 +74,11 @@ export function parseRuntimeEnv(input: Record<string, string | undefined>) {
       'Production requires HTTPS APP_ORIGIN and a stable CSRF_SECRET',
     );
   }
+  if (
+    parsed.EMAIL_MODE === 'brevo' &&
+    (!parsed.BREVO_API_KEY || !parsed.EMAIL_FROM)
+  )
+    throw new Error('Brevo requires BREVO_API_KEY and EMAIL_FROM');
   const mailpit = new URL(parsed.MAILPIT_URL);
   if (
     parsed.EMAIL_MODE === 'mailpit' &&

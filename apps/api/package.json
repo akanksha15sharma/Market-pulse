@@ -15,7 +15,7 @@
     "db:status": "prisma migrate status",
     "db:seed": "prisma db seed",
     "test:db": "node --import tsx --test --test-concurrency=1 tests/integration/database.test.ts",
-    "test:auth": "node --import tsx --test --test-concurrency=1 tests/unit/auth.test.ts",
+    "test:auth": "node --import tsx --test --test-concurrency=1 tests/unit/auth.test.ts tests/unit/email.test.ts",
     "test:auth:db": "node --import tsx --test --test-concurrency=1 tests/integration/auth.test.ts",
     "test:markets": "node --import tsx --test --test-concurrency=1 tests/unit/markets.test.ts",
     "test:markets:db": "node --import tsx --test --test-concurrency=1 tests/integration/markets.test.ts",
