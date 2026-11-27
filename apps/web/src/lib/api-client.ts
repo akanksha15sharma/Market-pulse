@@ -1,4 +1,8 @@
-import { announceApiWrite, sessionChangeEvent } from './api-events';
+import {
+  announceApiWrite,
+  sessionChangeEvent,
+  sessionExpiredEvent,
+} from './api-events';
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -99,6 +103,13 @@ async function request<T>(path: string, options: ApiOptions): Promise<T> {
       'Cannot reach MarketPulse. Check your connection and try again.',
     );
   }
+  if (
+    response.status === 401 &&
+    !options.signal?.aborted &&
+    !/^\/auth\/(login|register)$/.test(path) &&
+    typeof window !== 'undefined'
+  )
+    window.dispatchEvent(new Event(sessionExpiredEvent));
   if (response.status === 204) {
     if (method !== 'GET') announceApiWrite(path);
     return undefined as T;

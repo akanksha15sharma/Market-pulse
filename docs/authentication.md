@@ -191,3 +191,20 @@ checks, production builds, and formatting checks passed. Tests used injected
 transports/repository doubles; no production database or live email provider was
 accessed. Gmail delivery, sender rewriting, and account activation remain live
 manual verification steps after approved deployment.
+
+### Navigation session state
+
+The navbar verifies `/auth/me` rather than assuming a session from a cookie or
+showing a permanent sign-in link. It shows “Checking session…” while loading,
+“Account” and “Sign out” for an authenticated user, and “Sign in” only after an
+unauthorized response. Network/server failures show a retry control, not a false
+signed-out state. No identity or credentials are stored in browser storage.
+
+Login, registration, logout, session revocation, and password reset reuse existing
+session-change events. Navigation, tab focus/visibility, cross-tab signals, and a
+60-second visible authenticated-tab check refresh the navbar. Protected API 401s
+immediately clear its authenticated state; incorrect login attempts do not. Old
+requests are aborted and cannot restore stale state after logout or expiry.
+Navbar sign-out uses the existing CSRF-protected logout API, displays failures,
+and redirects only after success or confirmed session expiry. Account-page
+sign-out remains supported. Backend authorization remains the security boundary.

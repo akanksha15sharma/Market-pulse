@@ -1,3 +1,4 @@
+import { AuthNavigation } from '../features/auth/AuthNavigation';
 import { NotificationProvider } from '../features/notifications/NotificationProvider';
 import { NotificationBell } from '../features/notifications/NotificationBell';
 import { useMarketTheme } from '../features/markets/theme';
@@ -62,12 +63,7 @@ function AppShell() {
               Alerts
             </NavLink>
             <NotificationBell />
-            <Link to="/account" className="text-slate-300 hover:text-teal-300">
-              Account
-            </Link>
-            <Link to="/login" className="text-teal-300">
-              Sign in
-            </Link>
+            <AuthNavigation />
           </div>
         </nav>
       </header>

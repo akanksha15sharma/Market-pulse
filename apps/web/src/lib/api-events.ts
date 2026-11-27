@@ -1,3 +1,4 @@
+export const sessionExpiredEvent = 'marketpulse-session-expired';
 export const notificationChangeEvent = 'marketpulse-notifications-changed';
 export const sessionChangeEvent = 'marketpulse-session-changed';
 export const sessionChannel = 'marketpulse-session';

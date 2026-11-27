@@ -296,3 +296,162 @@ test('browser origin lock covers the complete CSRF/write pair and session change
     }
   }
 });
+
+test('navbar shows only actions supported by the verified session state', async () => {
+  const { SessionLinks } = await import('../src/features/auth/AuthNavigation');
+  for (const status of [
+    'loading',
+    'guest',
+    'authenticated',
+    'error',
+  ] as const) {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <SessionLinks
+          status={status}
+          busy={false}
+          retry={() => {}}
+          signOut={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    assert.equal(html.includes('Sign in'), status === 'guest');
+    assert.equal(html.includes('Sign out'), status === 'authenticated');
+    assert.equal(html.includes('href="/account"'), status === 'authenticated');
+    assert.equal(html.includes('Checking session'), status === 'loading');
+    assert.equal(html.includes('Retry account status'), status === 'error');
+  }
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <SessionLinks
+        status="authenticated"
+        busy
+        retry={() => {}}
+        signOut={() => {}}
+      />
+    </MemoryRouter>,
+  );
+  assert.match(html, /disabled=""/);
+  assert.match(html, /Signing out/);
+});
+
+test('session navigation follows initial loading, sign-in, sign-out and expiry', async () => {
+  const { createSessionStore } =
+    await import('../src/features/auth/session-store');
+  let signedIn = false;
+  const user = {
+    id: '00000000-0000-4000-8000-000000000001',
+    email: 'user@example.test',
+    displayName: 'Test',
+    emailVerified: false,
+  };
+  const store = createSessionStore(async () => {
+    if (!signedIn) throw new ApiError(401, 'Sign in');
+    return { user };
+  });
+  const states: string[] = [];
+  const unsubscribe = store.subscribe(() => {
+    states.push(store.getSnapshot());
+  });
+  assert.equal(store.getSnapshot(), 'loading');
+  await store.refresh();
+  assert.equal(store.getSnapshot(), 'guest');
+  signedIn = true;
+  await store.refresh();
+  assert.equal(store.getSnapshot(), 'authenticated');
+  signedIn = false;
+  await store.refresh();
+  assert.equal(store.getSnapshot(), 'guest');
+  signedIn = true;
+  await store.refresh();
+  store.expire();
+  assert.equal(store.getSnapshot(), 'guest');
+  assert.ok(states.includes('loading'));
+  unsubscribe();
+});
+
+test('network/provider failures and malformed identity remain unknown, not signed out', async () => {
+  const { createSessionStore } =
+    await import('../src/features/auth/session-store');
+  for (const failure of [
+    new ApiError(0, 'Offline'),
+    new ApiError(503, 'Unavailable'),
+    { user: {} },
+    undefined,
+  ]) {
+    const store = createSessionStore(async () => {
+      if (failure instanceof Error) throw failure;
+      return failure;
+    });
+    await store.refresh();
+    assert.equal(store.getSnapshot(), 'error');
+  }
+});
+
+test('late session responses cannot undo logout, expiry or a newer session check', async () => {
+  const { createSessionStore } =
+    await import('../src/features/auth/session-store');
+  const user = {
+    id: '00000000-0000-4000-8000-000000000001',
+    email: 'user@example.test',
+    displayName: 'Test',
+    emailVerified: false,
+  };
+  for (const transition of ['expire', 'refresh', 'unmount'] as const) {
+    let resolve!: (value: unknown) => void;
+    let calls = 0;
+    const store = createSessionStore(async () => {
+      calls++;
+      if (calls === 1)
+        return new Promise((done) => {
+          resolve = done;
+        });
+      throw new ApiError(401, 'Expired');
+    });
+    const pending = store.refresh();
+    if (transition === 'expire') store.expire();
+    else if (transition === 'refresh') await store.refresh();
+    else store.cancel();
+    resolve({ user });
+    await pending;
+    assert.equal(
+      store.getSnapshot(),
+      transition === 'unmount' ? 'loading' : 'guest',
+    );
+  }
+});
+
+test('protected API 401 signals session expiry while incorrect login does not', async () => {
+  const { sessionExpiredEvent } = await import('../src/lib/api-events');
+  const originalFetch = globalThis.fetch;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const events = new EventTarget();
+  let expired = 0;
+  events.addEventListener(sessionExpiredEvent, () => {
+    expired++;
+  });
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: events,
+  });
+  try {
+    globalThis.fetch = async (url) =>
+      String(url).endsWith('/csrf')
+        ? new Response(JSON.stringify({ csrfToken: 'test-token' }))
+        : new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          });
+    await assert.rejects(() => api('/auth/me'), /Unauthorized/);
+    assert.equal(expired, 1);
+    await assert.rejects(
+      () => api('/auth/login', { method: 'POST', body: {} }),
+      /Unauthorized/,
+    );
+    assert.equal(expired, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow)
+      Object.defineProperty(globalThis, 'window', originalWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+});
