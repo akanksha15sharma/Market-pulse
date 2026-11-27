@@ -37,7 +37,10 @@ const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/api/')) {
     requests.push(path);
-    if (path === '/api/v1/notifications/summary') {
+    if (
+      path === '/api/v1/notifications/summary' ||
+      path === '/api/v1/auth/me'
+    ) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Sign in to continue' }));
       return;
@@ -246,7 +249,10 @@ try {
             if (['hidden','clip','auto','scroll'].includes(style.overflowY) && (box.top < clip.top - 1 || box.bottom > clip.bottom + 1)) reasons.push('vertical clipping');
           }
         }
-        for (const [x,y] of [[box.left+2,box.top+2],[box.right-2,box.bottom-2],[(box.left+box.right)/2,(box.top+box.bottom)/2]]) {
+        // Rounded corners intentionally reveal the parent. Probe inside the
+        // painted corner instead of mistaking that cutout for an occluding layer.
+        const inset = Math.max(2, Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, box.width / 4, box.height / 4));
+        for (const [x,y] of [[box.left+inset,box.top+inset],[box.right-inset,box.bottom-inset],[(box.left+box.right)/2,(box.top+box.bottom)/2]]) {
           const hit = document.elementFromPoint(x,y);
           if (hit !== el && !el.contains(hit)) reasons.push('covered or clipped');
         }
@@ -339,6 +345,22 @@ try {
       ),
       false,
     );
+    await assertVisible('.asset-catalog-card');
+    await assertVisible('.asset-card-heading');
+    await assertVisible('.asset-catalog-card .asset-link');
+    await assertVisible('.asset-catalog-card .asset-chart-link');
+    await evaluate(
+      "document.querySelector('.asset-catalog-card .favorite-button').click()",
+    );
+    await until(
+      "document.querySelector('.asset-catalog-card .favorite-button').getAttribute('aria-pressed') === 'true'",
+    );
+    await evaluate(
+      "document.querySelector('.asset-catalog-card .favorite-button').click()",
+    );
+    await until(
+      "document.querySelector('.asset-catalog-card .favorite-button').getAttribute('aria-pressed') === 'false'",
+    );
     blocked = false;
     await evaluate(
       "[...document.querySelectorAll('button')].find(x=>x.textContent==='Retry display').click()",
@@ -382,6 +404,56 @@ try {
           "!!document.querySelector('iframe') && document.querySelector('.tradingview-widget-container').getAttribute('aria-busy') === 'false'",
         );
         await assertWidgetVisible();
+        if (path === '/markets') {
+          await until(
+            "document.querySelectorAll('.asset-catalog-card').length === 2",
+          );
+          for (const selector of [
+            '.asset-card-heading',
+            '.asset-catalog-card .favorite-button',
+            '.asset-chart-link',
+          ])
+            await assertVisible(selector);
+          const ratios = await evaluate(`(() => {
+            const luminance = color => color.match(/[\\d.]+/g).slice(0,3).map(Number).map(v => {v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
+            return [...document.querySelectorAll('.asset-catalog-card .asset-link strong, .asset-card-meta span, .asset-card-description, .asset-chart-link')].map(el => {
+              let parent=el;
+              while (getComputedStyle(parent).backgroundColor === 'rgba(0, 0, 0, 0)') parent=parent.parentElement;
+              const fg=luminance(getComputedStyle(el).color), bg=luminance(getComputedStyle(parent).backgroundColor);
+              return {text:el.textContent,ratio:(Math.max(fg,bg)+0.05)/(Math.min(fg,bg)+0.05)};
+            });
+          })()`);
+          for (const value of ratios)
+            assert.ok(
+              value.ratio >= 4.5,
+              `Card contrast: ${JSON.stringify(value)}`,
+            );
+          assert.equal(
+            await evaluate('document.documentElement.scrollWidth > innerWidth'),
+            false,
+          );
+          await evaluate('window.scrollTo(0,0)');
+          const dimensions = await send('Page.getLayoutMetrics', {}, sessionId);
+          const shot = await send(
+            'Page.captureScreenshot',
+            {
+              format: 'png',
+              captureBeyondViewport: true,
+              clip: {
+                x: 0,
+                y: 0,
+                width: width,
+                height: dimensions.cssContentSize.height,
+                scale: 1,
+              },
+            },
+            sessionId,
+          );
+          await writeFile(
+            join(artifacts, `dashboard-${width}-${theme}.png`),
+            Buffer.from(shot.data, 'base64'),
+          );
+        }
       }
     }
     // Negative control: DOM presence must not pass when a parent clips the footer.
@@ -430,9 +502,7 @@ try {
   await until(
     "document.body.innerText.includes('Loading market information') && !!document.querySelector('iframe')",
   );
-  await until(
-    "document.querySelectorAll('.market-table tbody tr').length === 2",
-  );
+  await until("document.querySelectorAll('.asset-catalog-card').length === 2");
   assert.equal(
     scenarioRequests,
     1,
@@ -454,9 +524,7 @@ try {
     sessionId,
   );
   await until("document.body.innerText.includes('Retrying automatically')");
-  await until(
-    "document.querySelectorAll('.market-table tbody tr').length === 2",
-  );
+  await until("document.querySelectorAll('.asset-catalog-card').length === 2");
   assert.equal(
     scenarioRequests,
     2,
@@ -473,9 +541,7 @@ try {
   await evaluate(
     "[...document.querySelectorAll('button')].find(e=>e.textContent === 'Try again').click()",
   );
-  await until(
-    "document.querySelectorAll('.market-table tbody tr').length === 2",
-  );
+  await until("document.querySelectorAll('.asset-catalog-card').length === 2");
   assert.equal(scenarioRequests, 2);
   results.push({
     transientCatalogFailure:
@@ -566,6 +632,7 @@ try {
     requests.every(
       (path) =>
         path === '/api/v1/notifications/summary' ||
+        path === '/api/v1/auth/me' ||
         path === '/api/v1/assets' ||
         path === `/api/v1/assets/${id}` ||
         path === `/api/v1/assets/${cryptoId}`,
@@ -591,6 +658,12 @@ try {
 } finally {
   clearTimeout(deadline);
   await send('Browser.close').catch(() => {});
-  chrome.kill('SIGTERM');
-  server.close();
+  // Close the local HTTP keep-alive sockets and DevTools pipe handles explicitly.
+  // Do not signal an already-exited browser after a successful close handshake.
+  server.closeAllConnections();
+  await new Promise((done) => server.close(done));
+  chrome.stdio[3].destroy();
+  chrome.stdio[4].destroy();
+  if (chrome.exitCode === null && chrome.signalCode === null)
+    chrome.kill('SIGTERM');
 }

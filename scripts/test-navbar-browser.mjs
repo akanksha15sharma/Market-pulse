@@ -194,7 +194,7 @@ try {
     );
   }
   const results = [];
-  for (const width of [1440, 768, 375, 320]) {
+  for (const width of [1440, 1280, 1024, 768, 375, 320]) {
     await send(
       'Emulation.setDeviceMetricsOverride',
       { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 },
@@ -235,6 +235,24 @@ try {
         );
       }
       await visible('.nav-link');
+      await visible('.nav-link[href="/watchlists"]');
+      await visible('.nav-link[href="/alerts"]');
+      if (width >= 1024) {
+        const placement = await evaluate(`(() => {
+          const box = selector => document.querySelector(selector).getBoundingClientRect();
+          const brand = box('.nav-brand'), links = box('.nav-primary-links'), tools = box('.theme-toggle'), notifications = box('.notification-bell'), profile = box('.profile-trigger');
+          return {centerError: Math.abs((links.left + links.right) / 2 - document.documentElement.clientWidth / 2), ordered: brand.right <= links.left && links.right <= tools.left && tools.right <= notifications.left && notifications.right <= profile.left};
+        })()`);
+        assert.ok(
+          placement.centerError <= 2,
+          `Desktop links are centered: ${JSON.stringify(placement)}`,
+        );
+        assert.equal(
+          placement.ordered,
+          true,
+          'Logo, center navigation, theme, notifications and profile do not overlap',
+        );
+      }
       await visible('.profile-trigger');
       await contrast('.nav-link');
       await contrast('.profile-trigger');

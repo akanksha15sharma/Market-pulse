@@ -1,3 +1,36 @@
+# Current market dashboard presentation
+
+The public dashboard uses genuine TradingView displays and a responsive catalog
+of asset cards. The older Phase 5 notes below describe historical functionality;
+use the B–D implementation report for current provider restrictions.
+
+- Desktop navigation has independent logo, centered market/watchlist/alert links,
+  and right-aligned theme, notification, and profile controls. Mobile disclosures
+  never determine desktop link visibility. The existing session checks and theme
+  persistence remain unchanged.
+- Asset cards retain the same UUID links, local favorites, URL search/type/favorite
+  filters, sort controls, and unavailable-symbol behavior. They do not introduce
+  native prices or sample observations. Cards use three, two, or one column as
+  the viewport narrows.
+- Dashboard typography, controls, card surfaces, and source disclosures use shared
+  theme colors. Chart container heights, provider attribution, privacy disclosure,
+  loading, failure, and retry behavior remain intact.
+- No API, provider mapping, authentication, database, or deployment settings change.
+
+Checks: `npm run test:web`, `npm run lint`,
+`npm run typecheck -w @marketpulse/web`, and
+`npm run build -w @marketpulse/web`. After the build, run
+`npm run test:navbar:browser` and `node scripts/test-market-browser.mjs` with Chrome
+installed. These use isolated local fixtures, not production users or prices.
+Navbar checks measure all three desktop links and their centered placement at
+1024, 1280, and 1440 pixels, then test mobile/tablet behavior in both themes.
+Market checks measure rendered cards, favorite controls, contrast, complete widget
+frames and source disclosures, with clipping/overlay negative controls and
+loading/retry cases. Screenshots are written to the temporary directories printed
+by the browser runners. Embedded test frames do not verify live feed delivery.
+
+---
+
 # Phase 5 — market UI
 
 The market dashboard is available at `/` and `/markets`. Asset links open

@@ -53,13 +53,22 @@ export function MarketDashboardPage() {
           Curated catalog<span>10 cryptocurrencies · 5 stocks</span>
         </span>
       </div>
-      <TradingViewWidget />
+      <div className="dashboard-chart-section">
+        <div className="dashboard-section-intro">
+          <p className="eyebrow">The bigger picture</p>
+          <p>Market trends, directly from the source.</p>
+        </div>
+        <TradingViewWidget />
+      </div>
       {loading && <MarketLoading refreshing={!!data} />}
       {error && <ResourceError message={error} retry={retry} />}
       {data && (
         <>
           <MarketSourcePolicy status={data.status} />
-          <section className="market-panel" aria-labelledby="catalog-heading">
+          <section
+            className="market-panel catalog-panel"
+            aria-labelledby="catalog-heading"
+          >
             <div className="panel-heading">
               <div>
                 <h2 id="catalog-heading">Explore markets</h2>
@@ -123,71 +132,60 @@ export function MarketDashboardPage() {
               {query ? ` matching “${query}”` : ''}
             </p>
             {assets.length ? (
-              <div
-                className="market-table-scroll"
-                role="region"
-                aria-label="Market prices"
-                tabIndex={0}
-              >
-                <table className="market-table">
-                  <caption className="sr-only">
-                    Market prices in USD. Select an asset to explore price
-                    history.
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">
-                        <span className="sr-only">Favorite</span>
-                      </th>
-                      <th scope="col">Asset</th>
-                      <th scope="col">Market display</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assets.map((asset) => {
-                      return (
-                        <tr key={asset.id}>
-                          <td>
-                            <FavoriteButton
-                              name={asset.name}
-                              selected={favorites.includes(asset.key)}
-                              onToggle={() => toggle(asset.key)}
-                            />
-                          </td>
-                          <th scope="row">
-                            <Link
-                              className="asset-link"
-                              to={`/assets/${asset.id}`}
-                            >
-                              <span
-                                className={`asset-mark ${asset.type === 'STOCK' ? 'stock-mark' : ''}`}
-                                aria-hidden="true"
-                              >
-                                {asset.symbol.slice(0, 2)}
-                              </span>
-                              <span>
-                                <strong>{asset.name}</strong>
-                                <span className="muted block">
-                                  {asset.symbol} · {asset.exchange ?? 'Crypto'}
-                                </span>
-                              </span>
-                            </Link>
-                          </th>
-                          <td>
-                            {tradingViewSymbol(asset) ? (
-                              <Link to={`/assets/${asset.id}`}>
-                                View interactive chart · TradingView
-                              </Link>
-                            ) : (
-                              'Market display unavailable'
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="asset-catalog-grid" aria-label="Asset catalog">
+                {assets.map((asset) => {
+                  const symbol = tradingViewSymbol(asset);
+                  return (
+                    <li key={asset.id} className="asset-catalog-card">
+                      <div className="asset-card-heading">
+                        <Link className="asset-link" to={`/assets/${asset.id}`}>
+                          <span
+                            className={`asset-mark ${asset.type === 'STOCK' ? 'stock-mark' : ''}`}
+                            aria-hidden="true"
+                          >
+                            {asset.symbol.slice(0, 2)}
+                          </span>
+                          <span>
+                            <strong>{asset.name}</strong>
+                            <span className="muted block">
+                              {asset.symbol} · {asset.exchange ?? 'Crypto'}
+                            </span>
+                          </span>
+                        </Link>
+                        <FavoriteButton
+                          name={asset.name}
+                          selected={favorites.includes(asset.key)}
+                          onToggle={() => toggle(asset.key)}
+                        />
+                      </div>
+                      <div className="asset-card-meta">
+                        <span className="asset-type-label">
+                          {asset.type === 'STOCK' ? 'Stock' : 'Cryptocurrency'}
+                        </span>
+                        <span>
+                          {symbol
+                            ? 'TradingView display'
+                            : 'Display unavailable'}
+                        </span>
+                      </div>
+                      <p className="asset-card-description">
+                        {symbol
+                          ? 'Explore interactive price history and market context.'
+                          : 'A market display is not currently available for this asset.'}
+                      </p>
+                      <Link
+                        className="asset-chart-link"
+                        to={`/assets/${asset.id}`}
+                      >
+                        {symbol
+                          ? 'View interactive chart'
+                          : 'View asset details'}
+                        <span aria-hidden="true">↗</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
               <div className="catalog-empty">
                 <h3>
