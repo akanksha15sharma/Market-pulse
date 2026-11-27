@@ -51,7 +51,7 @@ export function WatchlistsPage() {
   }, [fetcher.state, revalidator]);
   const matches = filterAssets(market.data?.assets ?? [], query, type, 'name');
   return (
-    <div className="market-dashboard watchlists-page">
+    <div className="market-dashboard workspace-page watchlists-page">
       <div className="market-heading">
         <div>
           <p className="eyebrow">Your personal market view</p>
@@ -298,9 +298,7 @@ export function WatchlistsPage() {
                           <strong>{asset.name}</strong>
                           <span className="muted block">
                             {asset.symbol} ·{' '}
-                            {asset.type === 'STOCK'
-                              ? 'Simulated stock data'
-                              : 'Crypto'}
+                            {asset.type === 'STOCK' ? 'Stock' : 'Crypto'}
                           </span>
                         </div>
                         <fetcher.Form method="post">

@@ -30,99 +30,89 @@ export function WatchlistAssets({
     );
   return (
     <div
-      className="market-table-scroll"
+      className="watchlist-saved-assets"
       role="region"
       aria-label="Saved asset prices"
       tabIndex={0}
     >
-      <table className="market-table">
-        <caption className="sr-only">
-          Saved assets with current cached USD prices
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Asset</th>
-            <th scope="col">Price / 24h</th>
-            <th scope="col">Source / observation</th>
-            <th scope="col">Manage</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map(({ asset, available }) => {
-            const quote = available
-              ? quotes.find((value) => value.assetId === asset.id)
-              : undefined;
-            return (
-              <tr key={asset.id}>
-                <th scope="row">
-                  {available ? (
-                    <Link className="asset-link" to={`/assets/${asset.id}`}>
-                      <span
-                        className={`asset-mark ${asset.type === 'STOCK' ? 'stock-mark' : ''}`}
-                        aria-hidden="true"
-                      >
-                        {asset.symbol.slice(0, 2)}
-                      </span>
-                      <span>
-                        <strong>{asset.name}</strong>
-                        <span className="muted block">
-                          {asset.symbol} ·{' '}
-                          {asset.type === 'STOCK' ? 'Stock' : 'Crypto'}
-                        </span>
-                      </span>
-                    </Link>
-                  ) : (
+      <ul className="saved-asset-list">
+        {items.map(({ asset, available }) => {
+          const quote = available
+            ? quotes.find((value) => value.assetId === asset.id)
+            : undefined;
+          return (
+            <li key={asset.id} className="saved-asset-card">
+              <div className="saved-asset-heading">
+                {available ? (
+                  <Link className="asset-link" to={`/assets/${asset.id}`}>
+                    <span
+                      className={`asset-mark ${asset.type === 'STOCK' ? 'stock-mark' : ''}`}
+                      aria-hidden="true"
+                    >
+                      {asset.symbol.slice(0, 2)}
+                    </span>
                     <span>
                       <strong>{asset.name}</strong>
                       <span className="muted block">
-                        {asset.symbol} · No longer in the active catalog
+                        {asset.symbol} ·{' '}
+                        {asset.type === 'STOCK' ? 'Stock' : 'Crypto'}
                       </span>
                     </span>
-                  )}
-                </th>
-                <td className="numeric">
-                  {money(quote?.price)}
-                  <span
-                    className={`block source-name ${quote?.changePercent == null ? 'muted' : Number(quote.changePercent) < 0 ? 'negative' : 'positive'}`}
-                  >
-                    {change(quote?.changePercent)}
+                  </Link>
+                ) : (
+                  <span>
+                    <strong>{asset.name}</strong>
+                    <span className="muted block">
+                      {asset.symbol} · No longer in the active catalog
+                    </span>
                   </span>
-                </td>
-                <td>
-                  {quote ? (
-                    <>
-                      <DataLabel simulated={quote.simulated} />
-                      <span className="source-name block muted">
-                        {quote.provider} ·{' '}
-                        <span className={`status-${quoteStatus(quote)}`}>
-                          {quoteStatus(quote)}
-                        </span>
+                )}
+              </div>
+              <div className="saved-asset-observation numeric">
+                <span className="saved-asset-label">Price / 24h</span>
+                {money(quote?.price)}
+                <span
+                  className={`block source-name ${quote?.changePercent == null ? 'muted' : Number(quote.changePercent) < 0 ? 'negative' : 'positive'}`}
+                >
+                  {change(quote?.changePercent)}
+                </span>
+              </div>
+              <div className="saved-asset-source">
+                {quote ? (
+                  <>
+                    <DataLabel simulated={quote.simulated} />
+                    <span className="source-name block muted">
+                      {quote.provider} ·{' '}
+                      <span className={`status-${quoteStatus(quote)}`}>
+                        {quoteStatus(quote)}
                       </span>
-                      <span className="source-name block muted">
-                        {observed(quote.sourceAt)}
-                      </span>
-                      <QuoteNotice quote={quote} />
-                    </>
-                  ) : (
-                    <>
-                      <span className="muted">Price unavailable</span>
-                      {available && (
-                        <Link
-                          className="source-name block"
-                          to={`/assets/${asset.id}`}
-                        >
-                          Open market chart
-                        </Link>
-                      )}
-                    </>
-                  )}
-                </td>
-                <td aria-disabled={disabled}>{remove(asset)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    </span>
+                    <span className="source-name block muted">
+                      {observed(quote.sourceAt)}
+                    </span>
+                    <QuoteNotice quote={quote} />
+                  </>
+                ) : (
+                  <>
+                    <span className="muted">Price unavailable</span>
+                    {available && (
+                      <Link
+                        className="source-name block"
+                        to={`/assets/${asset.id}`}
+                      >
+                        Open market chart
+                      </Link>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="saved-asset-actions" aria-disabled={disabled}>
+                {remove(asset)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

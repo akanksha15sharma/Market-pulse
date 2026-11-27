@@ -6,6 +6,8 @@ import http from 'node:http';
 import { readFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { resolve, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+const workspace = process.argv.includes('--workspace');
+let fixtureState = 'filled';
 const root = resolve('apps/web/dist');
 const artifacts = await mkdtemp(join(tmpdir(), 'marketpulse-navbar-'));
 let signedIn = true,
@@ -14,7 +16,56 @@ const user = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'user@example.test',
   displayName: 'Browser Test',
-  emailVerified: true,
+  emailVerified: !workspace,
+};
+const fixtureId = '00000000-0000-4000-8000-000000000002';
+const fixtureAsset = {
+  id: fixtureId,
+  key: 'crypto:bitcoin',
+  symbol: 'BTC',
+  name: 'Bitcoin',
+  type: 'CRYPTO',
+  exchange: null,
+  quoteCurrency: 'USD',
+  isDemoOnly: false,
+};
+const fixtureDate = '2026-11-28T10:00:00.000Z';
+const sessionFixture = {
+  id: fixtureId,
+  current: true,
+  createdAt: fixtureDate,
+  expiresAt: '2027-01-01T00:00:00.000Z',
+};
+const listFixture = {
+  id: fixtureId,
+  name: 'Long-term research and market ideas',
+  createdAt: fixtureDate,
+  items: [{ asset: fixtureAsset, available: true, addedAt: fixtureDate }],
+};
+const alertFixture = {
+  id: fixtureId,
+  asset: fixtureAsset,
+  provider: 'COINPAPRIKA',
+  mode: 'REAL',
+  currency: 'USD',
+  direction: 'ABOVE',
+  threshold: '100000',
+  status: 'PAUSED',
+  activation: 1,
+  armedAt: fixtureDate,
+  createdAt: fixtureDate,
+  eligibility: 'unsupported_source',
+  latestEvent: null,
+};
+const notificationFixture = {
+  id: fixtureId,
+  kind: 'WATCHLIST_CREATED',
+  message: 'Your research watchlist was created.',
+  createdAt: fixtureDate,
+  readAt: null,
+  subjectType: 'WATCHLIST',
+  subjectId: fixtureId,
+  actionUrl: `/watchlists?list=${fixtureId}`,
 };
 const writes = [];
 const server = http.createServer(async (req, res) => {
@@ -36,10 +87,55 @@ const server = http.createServer(async (req, res) => {
       res.statusCode = 401;
       body = { error: 'Sign in' };
     } else if (path.endsWith('/me')) body = { user };
-    else if (path.endsWith('/summary'))
-      body = { enabled: false, unreadCount: null };
-    else if (path.endsWith('/sessions')) body = { sessions: [] };
-    else if (path.endsWith('/assets')) body = { assets: [], total: 0 };
+    else if (path.endsWith('/resend-verification')) {
+      writes.push({ path, csrf: req.headers['x-csrf-token'] });
+      res.statusCode = 503;
+      body = { error: 'Email service temporarily unavailable.' };
+    } else if (path.endsWith('/summary')) {
+      if (workspace && fixtureState === 'error') {
+        res.statusCode = 503;
+        body = { error: 'Temporarily unavailable' };
+      } else
+        body =
+          workspace && fixtureState !== 'disabled'
+            ? { enabled: true, unreadCount: fixtureState === 'empty' ? 0 : 1 }
+            : { enabled: false, unreadCount: null };
+    } else if (path.endsWith('/sessions'))
+      body = {
+        sessions: workspace && fixtureState !== 'empty' ? [sessionFixture] : [],
+      };
+    else if (path.endsWith('/assets'))
+      body = {
+        assets: workspace ? [fixtureAsset] : [],
+        total: workspace ? 1 : 0,
+      };
+    else if (path === '/api/v1/watchlists')
+      body = { watchlists: fixtureState === 'empty' ? [] : [listFixture] };
+    else if (path === '/api/v1/alerts')
+      body = {
+        alerts: fixtureState === 'empty' ? [] : [alertFixture],
+        total: fixtureState === 'empty' ? 0 : 1,
+        page: 1,
+        limit: 20,
+        activeCount: 0,
+      };
+    else if (path.endsWith('/notifications/preferences'))
+      body = {
+        accountActivityEnabled: true,
+        watchlistActivityEnabled: true,
+        securityNotificationsRequired: true,
+      };
+    else if (path === '/api/v1/notifications')
+      body = {
+        notifications:
+          fixtureState === 'empty' ||
+          new URL(req.url, 'http://localhost').searchParams.get('filter') ===
+            'read'
+            ? []
+            : [notificationFixture],
+        unreadCount: fixtureState === 'empty' ? 0 : 1,
+        nextCursor: null,
+      };
     res.end(JSON.stringify(body));
     return;
   }
@@ -116,10 +212,13 @@ chrome.stdio[4].on('data', (chunk) => {
       exceptions.push(message.params.exceptionDetails.text);
   }
 });
-const deadline = setTimeout(() => {
-  chrome.kill('SIGKILL');
-  server.close();
-}, 120_000);
+const deadline = setTimeout(
+  () => {
+    chrome.kill('SIGKILL');
+    server.close();
+  },
+  workspace ? 240_000 : 120_000,
+);
 try {
   const target = await send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await send('Target.attachToTarget', {
@@ -194,7 +293,7 @@ try {
     );
   }
   const results = [];
-  for (const width of [1440, 1280, 1024, 768, 375, 320]) {
+  for (const width of workspace ? [] : [1440, 1280, 1024, 768, 375, 320]) {
     await send(
       'Emulation.setDeviceMetricsOverride',
       { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 },
@@ -340,6 +439,154 @@ try {
       );
     }
   }
+  if (workspace) {
+    async function checkControl(selector) {
+      await evaluate(
+        `(async () => { const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw new Error('Missing control');const r=el.getBoundingClientRect();window.scrollTo(0,scrollY+r.top-(innerHeight-r.height)/2);await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))); })()`,
+      );
+      await visible(selector);
+      await contrast(selector);
+    }
+    for (const width of [1440, 768, 375, 320]) {
+      await send(
+        'Emulation.setDeviceMetricsOverride',
+        { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 },
+        sessionId,
+      );
+      for (const theme of ['dark', 'light']) {
+        for (const scenario of ['filled', 'empty']) {
+          fixtureState = scenario;
+          user.emailVerified = scenario === 'empty';
+          for (const path of [
+            '/watchlists',
+            '/alerts',
+            '/notifications',
+            '/account',
+          ]) {
+            await send('Page.navigate', { url: origin + path }, sessionId);
+            await until(
+              "!!document.querySelector('.workspace-page h1') && !!document.querySelector('.profile-trigger')",
+            );
+            await evaluate(
+              `localStorage.setItem('marketpulse-theme',${JSON.stringify(theme)});window.dispatchEvent(new Event('marketpulse-theme'));`,
+            );
+            await until(
+              `document.documentElement.dataset.theme === ${JSON.stringify(theme)}`,
+            );
+            await checkControl('.workspace-page h1');
+            if (path === '/watchlists') {
+              await checkControl('#watchlist-name');
+              await checkControl('.watchlist-create .primary-button');
+              if (scenario === 'filled') {
+                await until(
+                  "document.body.innerText.includes('Price unavailable')",
+                );
+                await checkControl('#rename-list');
+                await checkControl('.saved-asset-actions button');
+                await checkControl('.watchlist-search-label input');
+                assert.equal(
+                  await evaluate(
+                    "document.body.innerText.includes('Simulated stock data')",
+                  ),
+                  false,
+                );
+              } else await checkControl('.watchlist-content .catalog-empty h2');
+            }
+            if (path === '/alerts') {
+              await until(
+                "document.body.innerText.includes('Price alerts are currently unavailable')",
+              );
+              await checkControl('#alert-direction');
+              await checkControl('#alert-threshold');
+              assert.equal(
+                await evaluate(
+                  "document.querySelector('.alert-target-form .primary-button').disabled",
+                ),
+                true,
+              );
+              if (scenario === 'filled')
+                await checkControl('.alert-card .alert-inline-actions a');
+              else await checkControl('.catalog-empty h3');
+            }
+            if (path === '/notifications') {
+              await until(
+                "!!document.querySelector('.notification-preferences input') && !document.body.innerText.includes('Loading notifications')",
+              );
+              await checkControl('.notification-toolbar .secondary-button');
+              await checkControl('.notification-preferences label strong');
+              if (scenario === 'filled')
+                await checkControl('.notification-item .secondary-button');
+              else await checkControl('.notification-empty h2');
+            }
+            if (path === '/account') {
+              await checkControl('.account-details dd');
+              if (scenario === 'filled') {
+                await checkControl('.account-verification button');
+                await checkControl('.account-session-list button');
+              } else
+                await checkControl('.account-sessions .catalog-empty button');
+              await checkControl('.account-signout button');
+            }
+            assert.equal(
+              await evaluate(
+                'document.documentElement.scrollWidth <= innerWidth',
+              ),
+              true,
+              `No overflow: ${path} ${width} ${theme} ${scenario}`,
+            );
+            await evaluate('window.scrollTo(0,0)');
+            const dimensions = await send(
+              'Page.getLayoutMetrics',
+              {},
+              sessionId,
+            );
+            const shot = await send(
+              'Page.captureScreenshot',
+              {
+                format: 'png',
+                captureBeyondViewport: true,
+                clip: {
+                  x: 0,
+                  y: 0,
+                  width,
+                  height: dimensions.cssContentSize.height,
+                  scale: 1,
+                },
+              },
+              sessionId,
+            );
+            await writeFile(
+              join(
+                artifacts,
+                `${path.slice(1)}-${width}-${theme}-${scenario}.png`,
+              ),
+              Buffer.from(shot.data, 'base64'),
+            );
+          }
+          results.push(
+            `${width}px ${theme} ${scenario}: all four private pages, visible controls, text contrast, no overflow, native alerts disabled`,
+          );
+        }
+      }
+    }
+    for (const scenario of ['disabled', 'error']) {
+      fixtureState = scenario;
+      await send(
+        'Page.navigate',
+        { url: origin + '/notifications' },
+        sessionId,
+      );
+      await until(
+        `document.body.innerText.includes(${JSON.stringify(scenario === 'disabled' ? 'Notifications are currently unavailable' : 'Could not load your inbox')})`,
+      );
+      await checkControl('.notification-status-panel');
+      results.push(
+        `Notification ${scenario} state: consistent panel and contrast`,
+      );
+    }
+    fixtureState = 'filled';
+    user.emailVerified = false;
+  }
   // Desktop sign-out failure keeps the authenticated state; success uses CSRF.
   await send(
     'Emulation.setDeviceMetricsOverride',
@@ -381,6 +628,10 @@ try {
 } finally {
   clearTimeout(deadline);
   await send('Browser.close').catch(() => {});
-  chrome.kill('SIGTERM');
-  server.close();
+  server.closeAllConnections();
+  await new Promise((done) => server.close(done));
+  chrome.stdio[3].destroy();
+  chrome.stdio[4].destroy();
+  if (chrome.exitCode === null && chrome.signalCode === null)
+    chrome.kill('SIGTERM');
 }

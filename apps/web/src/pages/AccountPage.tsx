@@ -23,89 +23,159 @@ export function AccountPage() {
     }
   }
   return (
-    <section className="max-w-2xl">
-      <h1 className="text-3xl font-semibold">Your account</h1>
-      <p className="mt-4">{user.displayName}</p>
-      <p className="break-all text-slate-400">{user.email}</p>
-      <div className="mt-6 rounded-xl border border-slate-700 p-5">
-        <h2 className="font-semibold">
-          Email {user.emailVerified ? 'verified' : 'not yet verified'}
-        </h2>
-        {!user.emailVerified && (
-          <>
-            <p className="mt-2 text-sm text-slate-400">
-              Request a verification link sent to your email address. Check your
-              spam folder if it does not arrive.
-            </p>
-            <button
-              disabled={busy}
-              className="secondary-button mt-4"
-              onClick={() => {
-                void perform(async () => {
-                  await api('/auth/resend-verification', { method: 'POST' });
-                  setStatus('Verification email requested.');
-                });
-              }}
-            >
-              Send verification link
-            </button>
-          </>
-        )}
+    <section className="market-dashboard workspace-page account-page">
+      <div className="market-heading">
+        <div>
+          <p className="eyebrow">Account & security</p>
+          <h1>Your account</h1>
+          <p className="market-subtitle">
+            Your profile, email verification and signed-in devices.
+          </p>
+        </div>
       </div>
-      <h2 className="mt-8 text-xl font-semibold">Active sessions</h2>
-      <ul className="mt-4 space-y-4">
-        {sessions.map((session) => (
-          <li
-            key={session.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700 p-4"
-          >
-            <div>
-              <p>
-                {session.current ? 'This session' : 'Another signed-in session'}
-              </p>
-              <p className="text-sm text-slate-400">
-                Expires {new Date(session.expiresAt).toLocaleString()}
-              </p>
-            </div>
-            <button
-              className="secondary-button"
-              disabled={busy}
-              onClick={() => {
-                void perform(async () => {
-                  await api(`/auth/sessions/${session.id}`, {
-                    method: 'DELETE',
-                  });
-                  if (session.current)
-                    await navigate('/login', { replace: true });
-                  else await revalidator.revalidate();
-                });
-              }}
-            >
-              Revoke
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p role="status" className="mt-4 text-teal-300">
+      <p role="status" className="workspace-feedback" aria-live="polite">
         {status}
       </p>
       {error && (
-        <p role="alert" className="text-rose-300">
+        <p role="alert" className="market-error">
           {error}
         </p>
       )}
-      <button
-        className="primary-button mt-8"
-        disabled={busy}
-        onClick={() => {
-          void perform(async () => {
-            await api('/auth/logout', { method: 'POST' });
-            await navigate('/login', { replace: true });
-          });
-        }}
+      <div className="account-layout">
+        <section
+          className="market-panel account-profile"
+          aria-labelledby="profile-heading"
+        >
+          <div className="panel-heading">
+            <h2 id="profile-heading">Profile</h2>
+            <span className="workspace-badge">Private account</span>
+          </div>
+          <dl className="account-details">
+            <div>
+              <dt>Display name</dt>
+              <dd>{user.displayName}</dd>
+            </div>
+            <div>
+              <dt>Email address</dt>
+              <dd>{user.email}</dd>
+            </div>
+          </dl>
+          <div className="account-verification">
+            <h3>
+              Email {user.emailVerified ? 'verified' : 'not yet verified'}
+            </h3>
+            {user.emailVerified ? (
+              <p className="muted">Your email address has been verified.</p>
+            ) : (
+              <>
+                <p className="muted">
+                  Request a verification link sent to your email address. Check
+                  your spam folder if it does not arrive.
+                </p>
+                <button
+                  disabled={busy}
+                  className="secondary-button"
+                  onClick={() => {
+                    void perform(async () => {
+                      await api('/auth/resend-verification', {
+                        method: 'POST',
+                      });
+                      setStatus('Verification email requested.');
+                    });
+                  }}
+                >
+                  Send verification link
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+        <section
+          className="market-panel account-sessions"
+          aria-labelledby="sessions-heading"
+        >
+          <div className="panel-heading">
+            <div>
+              <h2 id="sessions-heading">Active sessions</h2>
+              <p>Review where you are signed in.</p>
+            </div>
+            <span className="workspace-badge">
+              {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+            </span>
+          </div>
+          {sessions.length ? (
+            <ul className="account-session-list">
+              {sessions.map((session) => (
+                <li key={session.id}>
+                  <div>
+                    <p className="account-session-title">
+                      {session.current
+                        ? 'This session'
+                        : 'Another signed-in session'}
+                    </p>
+                    <p className="muted">
+                      Expires {new Date(session.expiresAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => {
+                      void perform(async () => {
+                        await api(`/auth/sessions/${session.id}`, {
+                          method: 'DELETE',
+                        });
+                        if (session.current)
+                          await navigate('/login', { replace: true });
+                        else await revalidator.revalidate();
+                      });
+                    }}
+                  >
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="catalog-empty">
+              <h3>No sessions to display</h3>
+              <p>Refresh your account to check for active sessions.</p>
+              <button
+                className="secondary-button"
+                disabled={busy || revalidator.state !== 'idle'}
+                onClick={() => {
+                  void revalidator.revalidate();
+                }}
+              >
+                Refresh sessions
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+      <section
+        className="market-panel account-signout"
+        aria-labelledby="signout-heading"
       >
-        Sign out
-      </button>
+        <div>
+          <h2 id="signout-heading">Sign out on this device</h2>
+          <p className="muted">
+            End your current session. You can sign in again whenever you need.
+          </p>
+        </div>
+        <button
+          className="secondary-button"
+          disabled={busy}
+          onClick={() => {
+            void perform(async () => {
+              await api('/auth/logout', { method: 'POST' });
+              await navigate('/login', { replace: true });
+            });
+          }}
+        >
+          Sign out
+        </button>
+      </section>
     </section>
   );
 }

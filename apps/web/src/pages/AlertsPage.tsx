@@ -56,7 +56,7 @@ export function AlertsPage() {
   };
   const selected = state.inspected;
   return (
-    <div className="market-dashboard alerts-page">
+    <div className="market-dashboard workspace-page alerts-page">
       <div className="market-heading">
         <div>
           <p className="eyebrow">Price alerts · USD</p>
@@ -307,7 +307,10 @@ export function AlertsPage() {
         ) : (
           <div className="catalog-empty">
             <h3>No alerts in this view</h3>
-            <p>Create a target above or choose another status filter.</p>
+            <p>
+              Choose another status filter to find saved targets. Native price
+              alerts remain unavailable.
+            </p>
           </div>
         )}
         <div className="alert-pagination">

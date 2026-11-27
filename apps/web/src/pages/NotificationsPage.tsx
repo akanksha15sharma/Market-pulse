@@ -1,5 +1,5 @@
 import { NotificationItem } from '../features/notifications/NotificationItem';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router';
 import type {
   NotificationHistory,
@@ -338,7 +338,7 @@ function Inbox() {
     }
   };
   return (
-    <div className="market-dashboard notifications-page">
+    <div className="market-dashboard workspace-page notifications-page">
       <div className="market-heading">
         <div>
           <p className="eyebrow">Your private activity</p>
@@ -420,36 +420,51 @@ function Inbox() {
     </div>
   );
 }
+function NotificationStatus({ children }: { children: ReactNode }) {
+  return (
+    <div className="market-dashboard workspace-page notifications-page">
+      <div className="market-heading">
+        <div>
+          <p className="eyebrow">Your private activity</p>
+          <h1>Notifications</h1>
+          <p className="market-subtitle">
+            Account updates and watchlist activity, all in one place.
+          </p>
+        </div>
+      </div>
+      <section className="market-panel notification-status-panel">
+        {children}
+      </section>
+    </div>
+  );
+}
 export function NotificationsPage() {
   const { status, revision, refresh } = useNotifications();
   if (status === 'guest') return <Navigate to="/login" replace />;
   if (status === 'loading')
     return (
-      <section>
-        <h1 className="text-3xl font-semibold">Notifications</h1>
+      <NotificationStatus>
         <p role="status" className="notification-empty muted">
           Loading your private inbox…
         </p>
-      </section>
+      </NotificationStatus>
     );
   if (status === 'error')
     return (
-      <section>
-        <h1 className="text-3xl font-semibold">Notifications</h1>
+      <NotificationStatus>
         <Failure
           message="Could not load your inbox. Please try again."
           retry={refresh}
         />
-      </section>
+      </NotificationStatus>
     );
   if (status === 'disabled')
     return (
-      <section>
-        <h1 className="text-3xl font-semibold">Notifications</h1>
+      <NotificationStatus>
         <p className="notification-empty muted">
           Notifications are currently unavailable.
         </p>
-      </section>
+      </NotificationStatus>
     );
   return <Inbox key={revision} />;
 }

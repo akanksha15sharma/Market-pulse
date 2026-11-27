@@ -2029,3 +2029,551 @@ html[data-theme='light'] .market-dashboard {
     transition: none;
   }
 }
+
+/* Private workspaces share the dashboard palette and accessible form controls. */
+.workspace-page {
+  --workspace-action-text: #042f2e;
+  --workspace-danger: #fda4af;
+  --workspace-danger-bg: #32222e;
+  --workspace-warning: #fde68a;
+  gap: 1.75rem;
+}
+html[data-theme='light'] .workspace-page {
+  --workspace-action-text: #ffffff;
+  --workspace-danger: #be123c;
+  --workspace-danger-bg: #fff1f2;
+  --workspace-warning: #854d0e;
+}
+.workspace-page .market-heading {
+  align-items: center;
+  padding-block: 0.5rem;
+}
+.workspace-page .market-heading h1 {
+  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  max-width: 24ch;
+  line-height: 1.15;
+}
+.workspace-page .market-subtitle {
+  max-width: 56ch;
+}
+.workspace-page .panel-heading {
+  gap: 1rem;
+  align-items: center;
+}
+.workspace-page .panel-heading h2 {
+  font-size: 1.15rem;
+}
+.workspace-page h3 {
+  color: var(--dashboard-text);
+  font-weight: 600;
+}
+.workspace-page label,
+.workspace-page legend {
+  color: var(--dashboard-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.workspace-page input:not([type='hidden']):not([type='checkbox']),
+.workspace-page select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin-top: 0.5rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  background-color: var(--dashboard-raised);
+  color: var(--dashboard-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.workspace-page input::placeholder {
+  color: var(--dashboard-muted);
+  opacity: 1;
+}
+.workspace-page select {
+  padding-right: 2rem;
+}
+.workspace-page :is(input, select, button):disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.workspace-page :is(.primary-button, .secondary-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  white-space: normal;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+.workspace-page .primary-button {
+  background: var(--dashboard-accent);
+  color: var(--workspace-action-text);
+  border: 1px solid transparent;
+}
+.workspace-page .primary-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.workspace-page .secondary-button {
+  background: var(--dashboard-surface);
+  color: var(--dashboard-accent);
+  border: 1px solid var(--dashboard-border);
+}
+.workspace-page .secondary-button:hover:not(:disabled) {
+  background: var(--dashboard-raised);
+  border-color: var(--dashboard-accent);
+}
+.workspace-page .secondary-button.watchlist-danger {
+  color: var(--workspace-danger);
+}
+.workspace-page .watchlist-danger:hover:not(:disabled) {
+  background: var(--workspace-danger-bg);
+  border-color: var(--workspace-danger);
+}
+.workspace-page
+  :is(
+    .positive,
+    .notification-count,
+    .notification-feedback,
+    .notification-action-link,
+    .notification-read-state
+  ) {
+  color: var(--dashboard-accent);
+}
+.workspace-page :is(.negative, .watchlist-danger) {
+  color: var(--workspace-danger);
+}
+.workspace-page :is(.status-stale, .watchlist-limit) {
+  color: var(--workspace-warning);
+}
+.workspace-page
+  :is(
+    .status-unavailable,
+    .quote-notice,
+    .alert-target-form label,
+    .watchlist-create label,
+    .watchlist-rename label,
+    .watchlist-search-label
+  ) {
+  color: var(--dashboard-muted);
+}
+.workspace-page .market-error {
+  background: var(--workspace-danger-bg);
+  color: var(--workspace-danger);
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.8rem;
+  line-height: 1.7;
+}
+.workspace-page
+  :is(
+    .watchlist-confirm,
+    .watchlist-create,
+    .watchlist-rename,
+    .watchlist-picker li,
+    .alert-pagination,
+    .alert-event-list li,
+    .notification-toolbar,
+    .notification-pagination,
+    .notification-item
+  ) {
+  border-color: var(--dashboard-border);
+}
+.workspace-page .watchlist-confirm {
+  background: var(--workspace-danger-bg);
+  color: var(--dashboard-text);
+}
+.workspace-page .watchlist-feedback,
+.workspace-feedback:not(:empty) {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.8rem;
+  background: var(--dashboard-tint);
+  color: var(--dashboard-accent);
+  line-height: 1.7;
+}
+.workspace-feedback:empty,
+.workspace-page .notification-feedback:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.workspace-page :is(.catalog-empty, .notification-empty) {
+  padding: clamp(2rem, 5vw, 3rem) 1.5rem;
+  text-align: center;
+  color: var(--dashboard-muted);
+  line-height: 1.75;
+}
+.workspace-page :is(.catalog-empty, .notification-empty) :is(h2, h3) {
+  color: var(--dashboard-text);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.workspace-page :is(.catalog-empty, .notification-empty) p {
+  max-width: 48ch;
+  margin: 0.75rem auto 1.25rem;
+}
+.workspace-page .market-loading {
+  color: var(--dashboard-muted);
+}
+.workspace-page .market-tabs {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.workspace-page .market-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--dashboard-muted);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4rem;
+}
+.workspace-page .market-tabs a[aria-current='page'] {
+  color: var(--dashboard-accent);
+  background: var(--dashboard-tint);
+}
+.workspace-badge,
+.workspace-page .notification-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.6rem;
+  background: var(--dashboard-tint);
+  color: var(--dashboard-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.workspace-page .watchlists-layout {
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: 1.25rem;
+}
+.workspace-page .watchlist-content {
+  gap: 1.25rem;
+}
+.workspace-page .watchlist-nav > a {
+  color: var(--dashboard-muted);
+  min-height: 44px;
+}
+.workspace-page .watchlist-nav > a:hover {
+  background: var(--dashboard-raised);
+  color: var(--dashboard-text);
+}
+.workspace-page .watchlist-nav > a[aria-current='page'] {
+  background: var(--dashboard-tint);
+  color: var(--dashboard-accent);
+}
+.workspace-page .watchlist-create,
+.workspace-page .watchlist-rename {
+  padding: 1.25rem;
+}
+.workspace-page .watchlist-picker {
+  padding: 0 1.25rem 1.25rem;
+}
+.workspace-page .watchlist-picker li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workspace-page .watchlist-picker form {
+  flex-shrink: 0;
+}
+.watchlist-saved-assets {
+  padding: 1.25rem;
+}
+.saved-asset-list {
+  display: grid;
+  gap: 1rem;
+}
+.saved-asset-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.8rem;
+  background: var(--dashboard-raised);
+}
+.saved-asset-heading {
+  min-width: 0;
+}
+.saved-asset-heading .asset-link {
+  white-space: normal;
+}
+.saved-asset-heading .asset-link > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.saved-asset-observation {
+  grid-column: 1;
+  color: var(--dashboard-text);
+}
+.saved-asset-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--dashboard-muted);
+}
+.saved-asset-source {
+  grid-column: 1;
+  min-width: 0;
+  color: var(--dashboard-muted);
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.saved-asset-source a {
+  color: var(--dashboard-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.saved-asset-actions {
+  grid-column: 2;
+  grid-row: 1;
+}
+.workspace-page .alert-target-form {
+  padding: 1.25rem;
+  gap: 1rem;
+}
+.workspace-page .alert-target-form > label {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.workspace-page .alert-target-form > p {
+  flex-basis: 100%;
+  line-height: 1.7;
+}
+.workspace-page .alert-cards {
+  padding: 1.25rem;
+  gap: 1rem;
+}
+.workspace-page .alert-card {
+  padding: 1.25rem;
+  border-color: var(--dashboard-border);
+  background: var(--dashboard-raised);
+}
+.workspace-page .alert-asset-title {
+  color: var(--dashboard-text);
+}
+.workspace-page .alert-asset-title:hover {
+  color: var(--dashboard-accent);
+}
+.workspace-page .alert-status {
+  border: 1px solid var(--dashboard-border);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+}
+.workspace-page .notification-toolbar {
+  padding: 1.25rem;
+  background: var(--dashboard-surface);
+}
+.workspace-page .notification-list {
+  padding: 0.5rem 1.25rem;
+}
+.workspace-page .notification-item {
+  margin-block: 0.65rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.8rem;
+  padding: 1.1rem;
+  background: var(--dashboard-surface);
+}
+.workspace-page .notification-item.is-unread {
+  border-left: 3px solid var(--dashboard-accent);
+  background: var(--dashboard-tint);
+}
+.workspace-page .notification-message {
+  font-size: 0.95rem;
+}
+.workspace-page .notification-read-state {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.workspace-page .notification-preferences {
+  padding: 1.5rem;
+}
+.workspace-page .notification-preferences label {
+  padding: 1rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.75rem;
+  background: var(--dashboard-raised);
+}
+.workspace-page .notification-preferences label .muted {
+  font-weight: 400;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+.workspace-page .notification-preferences input[type='checkbox'] {
+  accent-color: var(--dashboard-accent);
+  margin-top: 0.2rem;
+}
+.workspace-page .notification-security {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--dashboard-tint);
+  font-size: 0.85rem;
+}
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+.account-layout > * {
+  min-width: 0;
+}
+.account-details {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+.account-details dt {
+  color: var(--dashboard-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+.account-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+  line-height: 1.7;
+}
+.account-verification {
+  padding: 1.5rem;
+  border-top: 1px solid var(--dashboard-border);
+}
+.account-verification p {
+  margin-block: 0.65rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.account-session-list {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem;
+}
+.account-session-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 0.75rem;
+  background: var(--dashboard-raised);
+}
+.account-session-list li > div {
+  min-width: 0;
+  flex: 1 1 10rem;
+}
+.account-session-title {
+  color: var(--dashboard-text);
+  font-weight: 600;
+}
+.account-session-list .muted {
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.account-signout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+.account-signout > div {
+  flex: 1 1 16rem;
+}
+.account-signout h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.account-signout p {
+  margin-top: 0.6rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+@media (max-width: 900px) {
+  .workspace-page .watchlists-layout,
+  .account-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .workspace-page .market-heading {
+    align-items: stretch;
+  }
+  .workspace-page .panel-heading,
+  .workspace-page .notification-preferences,
+  .workspace-page .notification-toolbar,
+  .workspace-page .watchlist-create,
+  .workspace-page .watchlist-rename,
+  .workspace-page .alert-target-form,
+  .workspace-page .alert-cards,
+  .account-signout,
+  .account-details,
+  .account-verification {
+    padding: 1rem;
+  }
+  .workspace-page .watchlist-create {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-page .watchlist-rename {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .workspace-page .watchlist-rename label {
+    width: 100%;
+  }
+  .watchlist-saved-assets,
+  .account-session-list {
+    padding: 1rem;
+  }
+  .saved-asset-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .saved-asset-actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .workspace-page .notification-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .workspace-page .notification-item {
+    align-items: stretch;
+  }
+  .workspace-page .notification-item > button {
+    align-self: flex-start;
+  }
+  .workspace-page .alert-inline-actions > * {
+    flex: 1 1 8rem;
+  }
+  .workspace-page .alert-inline-actions button,
+  .workspace-page .alert-inline-actions a {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page :is(button, a) {
+    transition: none;
+  }
+}

@@ -113,3 +113,28 @@ See [Phase 5 verification](../PHASE5-VERIFICATION.md) for executed checks and li
 
 The live-provider switch and current hourly/daily chart availability are described
 in [CoinPaprika setup](live-crypto.md).
+
+## Private workspace presentation
+
+Watchlists, Alerts, Notifications, and Account share the dashboard's themed
+surfaces, typography, borders, form fields, buttons, focus indicators, and empty
+states. The `workspace-page` class scopes these refinements to private pages.
+Saved watchlist assets use responsive cards so price/source availability and
+removal controls remain visible on mobile. The picker labels catalog stocks as
+stocks; it does not imply that genuine chart displays are simulated.
+
+Account groups read-only profile information, email verification, active sessions,
+and current-device sign-out into separate panels. Notification loading, disabled,
+and error states use the same page heading and panel layout as the inbox.
+Existing preferences, ownership checks, session operations, API requests, and
+CSRF behavior remain unchanged. Native price alerts remain unavailable; this is
+a presentation change with no database migration or new provider integration.
+
+After building the frontend, `npm run test:workspace:browser` reuses the existing
+isolated Chrome runner with local API fixtures. It checks all four pages with
+populated and empty states at 1440, 768, 375, and 320 pixels in dark/light themes
+(64 page layouts), plus notification disabled/error states and sign-out success
+and failure. Checks include actual rendered control visibility, text contrast of
+at least 4.5:1, no horizontal overflow, and disabled native alert creation. It
+saves screenshots to the printed temporary directory. Synthetic fixture records
+exist only in the test server, never in application data or production.
