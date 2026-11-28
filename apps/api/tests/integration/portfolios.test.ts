@@ -151,7 +151,7 @@ test('portfolio ledger is private, rejects overselling, preserves data when pric
   );
   assert.equal(response.portfolios[0]!.positions[0]!.marketValue, null);
   assert.equal(response.portfolios[0]!.positions[0]!.totalReturn, null);
-  assert.deepEqual(await service.list(stranger), []);
+  assert.deepEqual(await service.list(stranger), { portfolios: [] });
 });
 
 test('concurrent sales serialize so the ledger cannot oversell', async () => {
