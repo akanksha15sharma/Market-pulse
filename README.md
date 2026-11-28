@@ -19,6 +19,9 @@ manually. This README describes the current code, not a fresh production audit.
   No widget data is scraped or used for backend calculations.
 - **Private watchlists:** up to five account-owned lists and 20 assets per list;
   create, rename, delete, add/remove assets, and open their market charts.
+- **Portfolio tracker:** private portfolios with user-entered buy/sell records,
+  holdings, and fee-inclusive cost basis. Market value and returns are shown only
+  when every open holding has a fresh, genuine quote; there is no simulated-price fallback.
 - **Notifications:** genuine account/watchlist activity, cursor-paginated history,
   unread counts, read/unread controls, mark-all-as-read, and preferences. APIs and
   producers are controlled by a server-side flag that defaults off.
@@ -50,7 +53,7 @@ flowchart LR
 ```
 
 Vercel serves the SPA and proxies `/api/*` to Render. The API owns authentication,
-validation, authorization, watchlists, notifications, and database access. Shared
+validation, authorization, portfolios, watchlists, notifications, and database access. Shared
 Zod schemas define frontend/backend contracts. Notification producers write in the
 same transaction as successful account/watchlist operations, with deduplication
 and preference checks. Private responses are not cached by the frontend/proxy.
@@ -59,6 +62,11 @@ TradingView runs directly in the browser, separately from the API. Production
 native market ingestion and alert evaluation remain disabled. Historical provider,
 worker, and simulated fixtures exist only for isolated development/testing; their
 presence does not authorize production data use.
+
+Portfolio trade prices are the values users enter for their own execution records;
+they are not provider prices and MarketPulse does not verify those fills. Holdings
+and invested cost are calculated from the ledger. Production market value and
+returns remain unavailable while no authorized native market quote source is enabled.
 
 | Path                       | Purpose                                                                     |
 | -------------------------- | --------------------------------------------------------------------------- |
@@ -247,6 +255,7 @@ versions; do not use forced dependency upgrades.
 
 [Documentation index](docs/README.md) · [Authentication](docs/authentication.md) ·
 [Current market UI](docs/market-ui.md) · [Provider-rights research](docs/provider-permissions-a2.md) ·
+[Portfolio tracker](docs/portfolio-tracker.md) ·
 [Implementation and data safeguards](docs/implementation-bcd.md) ·
 [Notification release runbook](docs/releases/notifications-production.md)
 

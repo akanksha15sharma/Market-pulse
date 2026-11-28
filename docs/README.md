@@ -44,6 +44,7 @@ or catalog contents. No implementation or production data/settings change was ma
 - [Market backend, worker, and budgets](market-backend.md)
 - [Dashboard and chart behavior](market-ui.md)
 - [Private watchlists](watchlists.md)
+- [Portfolio tracker](portfolio-tracker.md)
 - [Price alerts and target-reached records](alerts.md)
 
 ## Historical design and verification

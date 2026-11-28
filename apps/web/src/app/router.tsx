@@ -17,6 +17,11 @@ import { AccountPage } from '../pages/AccountPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
+import { PortfolioPage } from '../pages/PortfolioPage';
+import {
+  portfoliosAction,
+  portfoliosLoader,
+} from '../features/portfolios/actions';
 import { RouteErrorPage } from '../pages/RouteErrorPage';
 import { accountLoader } from '../features/auth/loaders';
 export const router = createBrowserRouter([
@@ -37,6 +42,12 @@ export const router = createBrowserRouter([
         loader: watchlistsLoader,
         action: watchlistsAction,
         element: <WatchlistsPage />,
+      },
+      {
+        path: '/portfolio',
+        loader: portfoliosLoader,
+        action: portfoliosAction,
+        element: <PortfolioPage />,
       },
       {
         path: '/alerts',

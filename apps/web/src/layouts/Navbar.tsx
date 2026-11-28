@@ -54,6 +54,9 @@ export function Navbar() {
           <NavLink to="/watchlists" className="nav-link">
             Watchlists
           </NavLink>
+          <NavLink to="/portfolio" className="nav-link">
+            Portfolio
+          </NavLink>
           <NavLink to="/alerts" className="nav-link">
             Alerts
           </NavLink>

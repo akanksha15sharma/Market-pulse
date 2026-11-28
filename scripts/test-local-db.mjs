@@ -10,6 +10,7 @@ import pg from 'pg';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const selected = process.env.MP_TEST_PG_BIN;
+const portfolioOnly = process.argv.includes('--portfolios');
 if (!selected)
   throw new Error(
     'Set MP_TEST_PG_BIN to reviewed PostgreSQL 17 binaries (initdb, pg_ctl, postgres). See docs/notifications-e1.md.',
@@ -134,16 +135,18 @@ try {
   console.log(`Temporary cluster and log directory: ${temporary}`);
   await run('npm', ['run', 'db:generate']);
   await run('npm', ['run', 'build', '-w', '@marketpulse/contracts']);
-  for (const name of [
-    'db:deploy',
-    'test:db',
-    'test:auth:db',
-    'test:markets:db',
-    'test:watchlists:db',
-    'test:alerts:db',
-    'test:notifications:db',
-  ])
-    await run('npm', ['run', name]);
+  const suites = portfolioOnly
+    ? ['db:deploy', 'test:portfolios:db']
+    : [
+        'db:deploy',
+        'test:db',
+        'test:auth:db',
+        'test:markets:db',
+        'test:watchlists:db',
+        'test:alerts:db',
+        'test:notifications:db',
+      ];
+  for (const name of suites) await run('npm', ['run', name]);
   console.log('All isolated database migration and integration suites passed.');
   if (process.argv.includes('--notification-browser'))
     await run(process.execPath, [

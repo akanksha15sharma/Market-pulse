@@ -23,6 +23,8 @@
     "worker:start": "node dist/worker.js",
     "test:watchlists": "node --import tsx --test --test-concurrency=1 tests/unit/watchlists.test.ts",
     "test:watchlists:db": "node --import tsx --test --test-concurrency=1 tests/integration/watchlists.test.ts",
+    "test:portfolios": "node --import tsx --test --test-concurrency=1 tests/unit/portfolios.test.ts",
+    "test:portfolios:db": "node --import tsx --test --test-concurrency=1 tests/integration/portfolios.test.ts",
     "markets:check": "node --import tsx src/tools/check-markets.ts",
     "test:alerts": "node --import tsx --test --test-concurrency=1 tests/unit/alerts.test.ts",
     "test:alerts:db": "node --import tsx --test --test-concurrency=1 tests/integration/alerts.test.ts",

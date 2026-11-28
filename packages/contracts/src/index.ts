@@ -15,3 +15,4 @@ export * from './alerts.js';
 export * from './market-capabilities.js';
 
 export * from './notifications.js';
+export * from './portfolio.js';

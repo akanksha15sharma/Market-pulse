@@ -60,6 +60,7 @@ jobs:
           npm run test:auth:db
           npm run test:markets:db
           npm run test:watchlists:db
+          npm run test:portfolios:db
           npm run test:alerts:db
           npm run test:notifications:db
       - name: Stop PostgreSQL

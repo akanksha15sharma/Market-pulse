@@ -28,6 +28,11 @@ import { marketRoutes } from './modules/markets/routes.js';
 import { createMarketRuntime } from './modules/markets/runtime.js';
 import type { MarketService } from './modules/markets/service.js';
 import { authMailer } from './email/auth-mailer.js';
+import { portfolioRoutes } from './modules/portfolios/routes.js';
+import {
+  createPortfolioService,
+  type PortfolioService,
+} from './modules/portfolios/service.js';
 
 export function createApp(
   auth: AuthService,
@@ -39,6 +44,7 @@ export function createApp(
     trustedProxies?: string[];
     readiness?: () => Promise<void>;
     notifications?: NotificationService;
+    portfolios?: PortfolioService;
   } = {},
 ) {
   const app = express();
@@ -100,6 +106,11 @@ export function createApp(
   app.use('/api/v1/auth', authRoutes(auth, config));
   if (watchlists)
     app.use('/api/v1/watchlists', watchlistRoutes(watchlists, auth, config));
+  if (options.portfolios)
+    app.use(
+      '/api/v1/portfolios',
+      portfolioRoutes(options.portfolios, auth, config),
+    );
   if (alerts) app.use('/api/v1/alerts', alertRoutes(alerts, auth, config));
   if (options.notifications)
     app.use(
@@ -192,6 +203,16 @@ const lazyNotifications = new Proxy({} as NotificationService, {
     return notificationService[key];
   },
 });
+let portfolioService: PortfolioService | undefined;
+const lazyPortfolios = new Proxy({} as PortfolioService, {
+  get(_target, key: keyof PortfolioService) {
+    portfolioService ??= createPortfolioService(
+      getDatabaseClient(),
+      lazyMarket,
+    );
+    return portfolioService[key];
+  },
+});
 export const app = createApp(
   lazyAuth,
   authConfig,
@@ -200,6 +221,7 @@ export const app = createApp(
   lazyAlerts,
   {
     notifications: lazyNotifications,
+    portfolios: lazyPortfolios,
     trustedProxies: env.TRUSTED_PROXIES,
     readiness: async () => {
       await getDatabaseClient().$queryRaw`SELECT 1`;
