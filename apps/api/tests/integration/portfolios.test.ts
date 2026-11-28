@@ -67,6 +67,19 @@ async function asset() {
   assets.push(row.id);
   return row;
 }
+async function cryptoAsset() {
+  const row = await db.asset.create({
+    data: {
+      key: `portfolio-test:${randomUUID()}`,
+      type: 'CRYPTO',
+      symbol: 'PCRYPT',
+      name: 'Portfolio test crypto',
+      isDemoOnly: false,
+    },
+  });
+  assets.push(row.id);
+  return row;
+}
 const input = (
   assetId: string,
   side: 'BUY' | 'SELL',
@@ -85,7 +98,10 @@ test('portfolio ledger is private, rejects overselling, preserves data when pric
   const owner = await user();
   const stranger = await user();
   const row = await asset();
-  const portfolio = await service.create(owner, { name: 'Personal ledger' });
+  const portfolio = await service.create(owner, {
+    name: 'Personal ledger',
+    mode: 'DEMO',
+  });
   await service.addTransaction(
     owner,
     portfolio.id,
@@ -141,7 +157,10 @@ test('portfolio ledger is private, rejects overselling, preserves data when pric
 test('concurrent sales serialize so the ledger cannot oversell', async () => {
   const owner = await user();
   const row = await asset();
-  const portfolio = await service.create(owner, { name: 'Concurrent ledger' });
+  const portfolio = await service.create(owner, {
+    name: 'Concurrent ledger',
+    mode: 'DEMO',
+  });
   await service.addTransaction(
     owner,
     portfolio.id,
@@ -176,7 +195,10 @@ test('concurrent sales serialize so the ledger cannot oversell', async () => {
 test('deleting a buy is blocked when it would make a later sale invalid', async () => {
   const owner = await user();
   const row = await asset();
-  const portfolio = await service.create(owner, { name: 'Correctable ledger' });
+  const portfolio = await service.create(owner, {
+    name: 'Correctable ledger',
+    mode: 'DEMO',
+  });
   await service.addTransaction(
     owner,
     portfolio.id,
@@ -204,4 +226,64 @@ test('deleting a buy is blocked when it would make a later sale invalid', async 
     (await service.list(owner)).portfolios[0]!.transactions.length,
     3,
   );
+});
+
+test('transaction mode follows portfolio mode and rejects incompatible catalog assets before database triggers', async () => {
+  const owner = await user();
+  const stock = await asset();
+  const crypto = await cryptoAsset();
+  const realPortfolio = await service.create(owner, {
+    name: 'Real market ledger',
+    mode: 'REAL',
+  });
+  await assert.rejects(
+    () =>
+      service.addTransaction(
+        owner,
+        realPortfolio.id,
+        input(stock.id, 'BUY', '1', '2026-04-01T10:00:00.000Z'),
+      ),
+    (error: unknown) =>
+      error instanceof HttpError &&
+      error.status === 409 &&
+      error.message.includes('demo-mode portfolio'),
+  );
+  await service.addTransaction(
+    owner,
+    realPortfolio.id,
+    input(crypto.id, 'BUY', '1', '2026-04-01T10:00:00.000Z'),
+  );
+  const realTrade = await db.transaction.findFirstOrThrow({
+    where: { portfolioId: realPortfolio.id },
+  });
+  assert.equal(realTrade.mode, 'REAL');
+
+  const demoPortfolio = await service.create(owner, {
+    name: 'Demo catalog ledger',
+    mode: 'DEMO',
+  });
+  await service.addTransaction(
+    owner,
+    demoPortfolio.id,
+    input(stock.id, 'BUY', '2', '2026-04-02T10:00:00.000Z'),
+  );
+  await assert.rejects(
+    () =>
+      service.addTransaction(
+        owner,
+        demoPortfolio.id,
+        input(crypto.id, 'BUY', '1', '2026-04-03T10:00:00.000Z'),
+      ),
+    (error: unknown) => error instanceof HttpError && error.status === 409,
+  );
+  const demoTrade = await db.transaction.findFirstOrThrow({
+    where: { portfolioId: demoPortfolio.id },
+  });
+  assert.equal(demoTrade.mode, 'DEMO');
+  const listedDemo = (await service.list(owner)).portfolios.find(
+    (portfolio) => portfolio.id === demoPortfolio.id,
+  )!;
+  assert.equal(listedDemo.mode, 'DEMO');
+  assert.equal(listedDemo.positions[0]!.marketValue, null);
+  assert.equal(listedDemo.positions[0]!.totalReturn, null);
 });

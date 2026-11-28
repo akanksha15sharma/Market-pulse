@@ -43,12 +43,15 @@ function trade(
     asset,
   };
 }
-function holding(transactions: ReturnType<typeof trade>[]) {
+function holding(
+  transactions: ReturnType<typeof trade>[],
+  mode: 'REAL' | 'DEMO' = 'REAL',
+) {
   return {
     id: portfolioId,
     userId,
     name: 'Test portfolio',
-    mode: 'REAL' as const,
+    mode,
     baseCurrency: 'USD',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     transactions,
@@ -127,6 +130,19 @@ test('a crypto quote cannot value a stock or a demo-only catalog asset', () => {
   } as unknown as ReturnType<typeof trade>;
   const portfolio = holding([stockTrade]);
   const result = calculatePortfolio(portfolio, [quote()]);
+  assert.equal(result.positions[0]!.marketValue, null);
+  assert.equal(result.positions[0]!.totalReturn, null);
+  assert.equal(result.valuationAvailable, false);
+});
+
+test('demo-mode ledgers never use even a fresh genuine quote for valuation', () => {
+  const portfolio = holding(
+    [trade('BUY', '2', '100', '0', '2026-01-01T10:00:00Z')],
+    'DEMO',
+  );
+  const result = calculatePortfolio(portfolio, [quote()]);
+  assert.equal(result.mode, 'DEMO');
+  assert.equal(result.positions[0]!.investedAmount, '200.000000000000000000');
   assert.equal(result.positions[0]!.marketValue, null);
   assert.equal(result.positions[0]!.totalReturn, null);
   assert.equal(result.valuationAvailable, false);

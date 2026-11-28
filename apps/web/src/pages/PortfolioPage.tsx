@@ -80,7 +80,14 @@ export function PortfolioPage() {
                   selected?.id === portfolio.id ? 'page' : undefined
                 }
               >
-                <span>{portfolio.name}</span>
+                <span>
+                  {portfolio.name}
+                  <small className="portfolio-mode-label">
+                    {portfolio.mode === 'REAL'
+                      ? 'Real-price eligible'
+                      : 'Demo-only catalog'}
+                  </small>
+                </span>
                 <span className="muted">
                   {
                     portfolio.positions.filter(
@@ -110,6 +117,23 @@ export function PortfolioPage() {
                 disabled={busy || portfolios.length >= 10}
               />
             </label>
+            <label htmlFor="portfolio-mode">
+              Asset context
+              <select
+                id="portfolio-mode"
+                name="mode"
+                defaultValue="REAL"
+                disabled={busy || portfolios.length >= 10}
+              >
+                <option value="REAL">Real-price eligible assets</option>
+                <option value="DEMO">Demo-only catalog assets</option>
+              </select>
+            </label>
+            <p className="portfolio-form-note">
+              Stocks in the catalog are currently demo-only. Their user-entered
+              trades are saved separately and never valued with simulated
+              prices.
+            </p>
             <button
               className="primary-button"
               disabled={busy || portfolios.length >= 10}
@@ -127,7 +151,11 @@ export function PortfolioPage() {
             >
               <div className="panel-heading">
                 <div>
-                  <p className="eyebrow">Portfolio · USD</p>
+                  <p className="eyebrow">
+                    {selected.mode === 'REAL'
+                      ? 'Portfolio · Real-price eligible · USD'
+                      : 'Portfolio · Demo-only catalog · USD'}
+                  </p>
                   <h2 id="portfolio-heading">{selected.name}</h2>
                 </div>
                 <button
@@ -201,7 +229,15 @@ export function PortfolioPage() {
                   </strong>
                 </div>
               </div>
-              {!selected.valuationAvailable &&
+              {selected.mode === 'DEMO' && (
+                <p className="portfolio-disclosure" role="status">
+                  This portfolio uses demo-only catalog assets. Your own trade
+                  entries are preserved, but market value and returns stay
+                  unavailable; simulated prices are never used.
+                </p>
+              )}
+              {selected.mode === 'REAL' &&
+                !selected.valuationAvailable &&
                 selected.positions.some(
                   (position) => Number(position.quantity) > 0,
                 ) && (
@@ -309,12 +345,18 @@ export function PortfolioPage() {
                     <option value="" disabled>
                       Select an asset
                     </option>
-                    {assets.map((asset) => (
-                      <option key={asset.id} value={asset.id}>
-                        {asset.name} ({asset.symbol}) ·{' '}
-                        {asset.type === 'STOCK' ? 'Stock' : 'Crypto'}
-                      </option>
-                    ))}
+                    {assets
+                      .filter((asset) =>
+                        selected.mode === 'DEMO'
+                          ? asset.isDemoOnly
+                          : !asset.isDemoOnly,
+                      )
+                      .map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.name} ({asset.symbol}) ·{' '}
+                          {asset.type === 'STOCK' ? 'Stock' : 'Crypto'}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <label>
@@ -373,8 +415,9 @@ export function PortfolioPage() {
                   />
                 </label>
                 <p className="portfolio-form-note">
-                  The entered execution price is saved as part of your ledger.
-                  It is not treated as a current market quote.
+                  {selected.mode === 'DEMO'
+                    ? 'The entered execution price is your own ledger record. This demo-only catalog mode never produces market valuations or returns.'
+                    : 'The entered execution price is saved as part of your ledger. It is not treated as a current market quote.'}
                 </p>
                 <button
                   className="primary-button"

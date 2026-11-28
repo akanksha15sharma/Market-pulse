@@ -34,10 +34,13 @@ export async function portfoliosAction({ request }: ActionFunctionArgs) {
       .enum(['create', 'delete', 'add-trade', 'delete-trade'])
       .parse(form.get('intent'));
     if (intent === 'create') {
-      const { name } = portfolioInputSchema.parse({ name: form.get('name') });
+      const { name, mode } = portfolioInputSchema.parse({
+        name: form.get('name'),
+        mode: form.get('mode'),
+      });
       const result = await api<{ portfolio: { id: string } }>('/portfolios', {
         method: 'POST',
-        body: { name },
+        body: { name, mode },
       });
       return redirect(`/portfolio?portfolio=${result.portfolio.id}`);
     }

@@ -72,6 +72,7 @@ export function calculatePortfolio(
     const sourceAt = quote?.sourceAt ? Date.parse(quote.sourceAt) : Number.NaN;
     const priceIsValid =
       position.quantity.gt(0) &&
+      portfolio.mode === 'REAL' &&
       position.asset.type === 'CRYPTO' &&
       !position.asset.isDemoOnly &&
       quote?.provider === 'COINPAPRIKA' &&
@@ -144,6 +145,7 @@ export function calculatePortfolio(
   return portfolioSchema.parse({
     id: portfolio.id,
     name: portfolio.name,
+    mode: portfolio.mode,
     baseCurrency: 'USD',
     createdAt: portfolio.createdAt.toISOString(),
     investedAmount: invested.toFixed(18),
@@ -180,7 +182,15 @@ export function createPortfolioService(
       const ids = [
         ...new Set(
           portfolios.flatMap((portfolio) =>
-            portfolio.transactions.map((transaction) => transaction.assetId),
+            portfolio.mode === 'REAL'
+              ? portfolio.transactions
+                  .filter(
+                    (transaction) =>
+                      transaction.asset.type === 'CRYPTO' &&
+                      !transaction.asset.isDemoOnly,
+                  )
+                  .map((transaction) => transaction.assetId)
+              : [],
           ),
         ),
       ];

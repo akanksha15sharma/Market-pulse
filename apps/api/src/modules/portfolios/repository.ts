@@ -63,9 +63,9 @@ export function createPortfolioRepository(db: PrismaClient) {
     lock = false,
   ) {
     if (lock)
-      await tx.$queryRaw`SELECT id FROM portfolios WHERE id = ${id}::uuid AND "userId" = ${userId}::uuid AND mode = 'REAL'::"DataMode" FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM portfolios WHERE id = ${id}::uuid AND "userId" = ${userId}::uuid FOR UPDATE`;
     const portfolio = await tx.portfolio.findFirst({
-      where: { id, userId, mode: 'REAL' },
+      where: { id, userId },
       include,
     });
     if (!portfolio) throw missing();
@@ -90,21 +90,21 @@ export function createPortfolioRepository(db: PrismaClient) {
   return {
     list(userId: string) {
       return db.portfolio.findMany({
-        where: { userId, mode: 'REAL' },
+        where: { userId },
         include,
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
     },
     async create(userId: string, input: unknown) {
-      const { name } = portfolioInputSchema.parse(input);
+      const { name, mode } = portfolioInputSchema.parse(input);
       return write(userId, async (tx) => {
         if (
-          (await tx.portfolio.count({ where: { userId, mode: 'REAL' } })) >=
+          (await tx.portfolio.count({ where: { userId } })) >=
           PORTFOLIO_LIMITS.portfolios
         )
           throw new HttpError(409, 'You can create up to 10 portfolios.');
         return tx.portfolio.create({
-          data: { userId, name, mode: 'REAL', baseCurrency: 'USD' },
+          data: { userId, name, mode, baseCurrency: 'USD' },
           include,
         });
       });
@@ -129,6 +129,14 @@ export function createPortfolioRepository(db: PrismaClient) {
         });
         if (!asset)
           throw new HttpError(404, 'Asset is not in the active catalog.');
+        const expectedMode = asset.isDemoOnly ? 'DEMO' : 'REAL';
+        if (portfolio.mode !== expectedMode)
+          throw new HttpError(
+            409,
+            asset.isDemoOnly
+              ? 'This demo-only asset must be recorded in a demo-mode portfolio.'
+              : 'This asset must be recorded in a real-mode portfolio.',
+          );
         const createdAt = new Date(
           Math.max(
             Date.now(),
@@ -148,7 +156,7 @@ export function createPortfolioRepository(db: PrismaClient) {
           data: {
             portfolioId: portfolio.id,
             assetId: asset.id,
-            mode: 'REAL',
+            mode: portfolio.mode,
             side: value.side,
             quantity: value.quantity,
             unitPrice: value.unitPrice,
@@ -185,7 +193,7 @@ export function createPortfolioRepository(db: PrismaClient) {
     async delete(userId: string, id: string) {
       return write(userId, async (tx) => {
         const result = await tx.portfolio.deleteMany({
-          where: { id, userId, mode: 'REAL' },
+          where: { id, userId },
         });
         if (!result.count) throw missing();
       });

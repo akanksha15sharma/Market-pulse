@@ -2794,6 +2794,13 @@ html[data-theme='light'] .workspace-page {
   overflow-wrap: anywhere;
   font-weight: 600;
 }
+.portfolio-mode-label {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--dashboard-muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
 .portfolio-nav .muted {
   flex-shrink: 0;
   font-size: 0.75rem;

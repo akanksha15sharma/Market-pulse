@@ -33,7 +33,7 @@ const portfolioSignedAmountSchema = z
   .string()
   .regex(signedAmountPattern, 'Invalid calculated amount');
 export const portfolioInputSchema = z
-  .object({ name: portfolioNameSchema })
+  .object({ name: portfolioNameSchema, mode: z.enum(['REAL', 'DEMO']) })
   .strict();
 export const portfolioTransactionInputSchema = z
   .object({
@@ -70,6 +70,7 @@ export const portfolioPositionSchema = z.object({
 export const portfolioSchema = z.object({
   id: z.uuid(),
   name: portfolioNameSchema,
+  mode: z.enum(['REAL', 'DEMO']),
   baseCurrency: z.literal('USD'),
   createdAt: z.iso.datetime(),
   investedAmount: portfolioFeeSchema,

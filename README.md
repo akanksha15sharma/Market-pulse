@@ -21,7 +21,9 @@ manually. This README describes the current code, not a fresh production audit.
   create, rename, delete, add/remove assets, and open their market charts.
 - **Portfolio tracker:** private portfolios with user-entered buy/sell records,
   holdings, and fee-inclusive cost basis. Market value and returns are shown only
-  when every open holding has a fresh, genuine quote; there is no simulated-price fallback.
+  for real-mode holdings when every open asset has a fresh, genuine quote. Demo-only
+  catalog assets use a separate ledger mode with no market valuation; no
+  simulated-price fallback is used.
 - **Notifications:** genuine account/watchlist activity, cursor-paginated history,
   unread counts, read/unread controls, mark-all-as-read, and preferences. APIs and
   producers are controlled by a server-side flag that defaults off.
