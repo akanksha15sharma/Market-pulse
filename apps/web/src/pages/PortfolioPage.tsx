@@ -1,6 +1,13 @@
-import { useState } from 'react';
-import { Link, useFetcher, useLoaderData, useSearchParams } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Link,
+  useFetcher,
+  useLoaderData,
+  useNavigate,
+  useSearchParams,
+} from 'react-router';
 import type {
+  PortfolioActionResult,
   portfoliosAction,
   portfoliosLoader,
 } from '../features/portfolios/actions';
@@ -27,11 +34,29 @@ export function PortfolioPage() {
   const { portfolios, assets } = useLoaderData<typeof portfoliosLoader>();
   const [params] = useSearchParams();
   const fetcher = useFetcher<typeof portfoliosAction>();
+  const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [feedback, setFeedback] = useState<PortfolioActionResult | null>(null);
+  const createForm = useRef<HTMLFormElement | null>(null);
+  const tradeForm = useRef<HTMLFormElement | null>(null);
+  const handledData = useRef<PortfolioActionResult | undefined>(undefined);
   const selected =
     portfolios.find((item) => item.id === params.get('portfolio')) ??
     portfolios[0];
   const busy = fetcher.state !== 'idle';
+
+  useEffect(() => {
+    const result = fetcher.data;
+    if (fetcher.state !== 'idle' || !result || result === handledData.current)
+      return;
+    handledData.current = result;
+    setFeedback(result);
+    if (result.ok) {
+      if (result.intent === 'create') createForm.current?.reset();
+      if (result.intent === 'add-trade') tradeForm.current?.reset();
+      if (result.redirectTo) navigate(result.redirectTo);
+    }
+  }, [fetcher.data, fetcher.state, navigate]);
 
   return (
     <div className="market-dashboard workspace-page portfolio-page">
@@ -46,14 +71,14 @@ export function PortfolioPage() {
         </div>
         <span className="catalog-chip">{portfolios.length} portfolios</span>
       </header>
-      {fetcher.data && (
+      {feedback && !busy && (
         <p
           className={
-            fetcher.data.ok ? 'watchlist-feedback positive' : 'market-error'
+            feedback.ok ? 'watchlist-feedback positive' : 'market-error'
           }
-          role={fetcher.data.ok ? 'status' : 'alert'}
+          role={feedback.ok ? 'status' : 'alert'}
         >
-          {fetcher.data.message}
+          {feedback.message}
         </p>
       )}
       {busy && (
@@ -76,6 +101,7 @@ export function PortfolioPage() {
               <Link
                 key={portfolio.id}
                 to={`?portfolio=${portfolio.id}`}
+                onClick={() => setFeedback(null)}
                 aria-current={
                   selected?.id === portfolio.id ? 'page' : undefined
                 }
@@ -104,7 +130,12 @@ export function PortfolioPage() {
               </p>
             )}
           </nav>
-          <fetcher.Form method="post" className="portfolio-create">
+          <fetcher.Form
+            method="post"
+            className="portfolio-create"
+            ref={createForm}
+            onSubmit={() => setFeedback(null)}
+          >
             <input type="hidden" name="intent" value="create" />
             <label htmlFor="portfolio-name">
               New portfolio
@@ -178,7 +209,13 @@ export function PortfolioPage() {
                     {selected.transactions.length} recorded trades?
                   </p>
                   <div className="portfolio-actions">
-                    <fetcher.Form method="post">
+                    <fetcher.Form
+                      method="post"
+                      onSubmit={() => {
+                        setFeedback(null);
+                        setConfirmDelete(false);
+                      }}
+                    >
                       <input type="hidden" name="intent" value="delete" />
                       <input
                         type="hidden"
@@ -331,7 +368,12 @@ export function PortfolioPage() {
                   <h2 id="trade-heading">Record a trade</h2>
                 </div>
               </div>
-              <fetcher.Form method="post" className="portfolio-trade-form">
+              <fetcher.Form
+                method="post"
+                className="portfolio-trade-form"
+                ref={tradeForm}
+                onSubmit={() => setFeedback(null)}
+              >
                 <input type="hidden" name="intent" value="add-trade" />
                 <input type="hidden" name="portfolioId" value={selected.id} />
                 <label>
@@ -476,7 +518,10 @@ export function PortfolioPage() {
                           {new Date(transaction.executedAt).toLocaleString()}
                         </strong>
                       </div>
-                      <fetcher.Form method="post">
+                      <fetcher.Form
+                        method="post"
+                        onSubmit={() => setFeedback(null)}
+                      >
                         <input
                           type="hidden"
                           name="intent"

@@ -12,6 +12,7 @@ const child = spawn(
     'tests/auth.test.tsx',
     'tests/markets.test.tsx',
     'tests/watchlists.test.tsx',
+    'tests/portfolios.test.tsx',
     'tests/live-crypto.test.tsx',
     'tests/alerts.test.tsx',
   ],

@@ -9,6 +9,13 @@ import { z } from 'zod';
 import { api, ApiError } from '../../lib/api-client';
 
 const catalogSchema = z.object({ assets: z.array(assetSchema) });
+export type PortfolioActionResult = {
+  ok: boolean;
+  intent: 'create' | 'delete' | 'add-trade' | 'delete-trade' | 'unknown';
+  message: string;
+  redirectTo: string | null;
+};
+
 export async function portfoliosLoader() {
   try {
     const [portfolioData, catalogData] = await Promise.all([
@@ -29,8 +36,9 @@ export async function portfoliosAction({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST')
     throw new Response('Method not allowed', { status: 405 });
   const form = await request.formData();
+  let intent: PortfolioActionResult['intent'] = 'unknown';
   try {
-    const intent = z
+    intent = z
       .enum(['create', 'delete', 'add-trade', 'delete-trade'])
       .parse(form.get('intent'));
     if (intent === 'create') {
@@ -42,13 +50,23 @@ export async function portfoliosAction({ request }: ActionFunctionArgs) {
         method: 'POST',
         body: { name, mode },
       });
-      return redirect(`/portfolio?portfolio=${result.portfolio.id}`);
+      return data({
+        ok: true,
+        intent,
+        message: 'Portfolio created.',
+        redirectTo: `/portfolio?portfolio=${result.portfolio.id}`,
+      } satisfies PortfolioActionResult);
     }
     const id = z.uuid().parse(form.get('portfolioId'));
     const path = `/portfolios/${id}`;
     if (intent === 'delete') {
       await api(path, { method: 'DELETE' });
-      return redirect('/portfolio');
+      return data({
+        ok: true,
+        intent,
+        message: 'Portfolio deleted.',
+        redirectTo: '/portfolio',
+      } satisfies PortfolioActionResult);
     }
     if (intent === 'add-trade') {
       const localExecutedAt = z.string().min(1).parse(form.get('executedAt'));
@@ -65,24 +83,36 @@ export async function portfoliosAction({ request }: ActionFunctionArgs) {
         executedAt,
       });
       await api(`${path}/transactions`, { method: 'POST', body: input });
-      return data({ ok: true, message: 'Trade recorded.' });
+      return data({
+        ok: true,
+        intent,
+        message: `${input.side === 'BUY' ? 'Buy' : 'Sell'} trade recorded.`,
+        redirectTo: null,
+      } satisfies PortfolioActionResult);
     }
     const transactionId = z.uuid().parse(form.get('transactionId'));
     await api(`${path}/transactions/${transactionId}`, { method: 'DELETE' });
-    return data({ ok: true, message: 'Trade removed.' });
+    return data({
+      ok: true,
+      intent,
+      message: 'Trade removed.',
+      redirectTo: null,
+    } satisfies PortfolioActionResult);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401)
       return redirect('/login');
     return data(
       {
         ok: false,
+        intent,
         message:
           error instanceof z.ZodError
             ? 'Enter a valid portfolio name or trade with a positive quantity and execution price.'
             : error instanceof ApiError
               ? error.message
               : 'Unable to save this change. Please try again.',
-      },
+        redirectTo: null,
+      } satisfies PortfolioActionResult,
       {
         status:
           error instanceof ApiError && error.status >= 400
